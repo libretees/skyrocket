@@ -25,7 +25,7 @@ def import_settings(args):
     except:
         logger.debug('Django Settings Module could not be loaded from environment variable.')
 
-    project_directory = os.path.abspath(args.directory)
+    project_directory = os.path.abspath(os.path.expanduser(args.directory))
     project_name = project_directory.split(os.sep)[-1]
     relative_path = os.path.join(os.path.relpath(project_directory, os.getcwd()), project_name, 'settings.py')
     logger.info('Loading (%s)' % relative_path)
@@ -60,7 +60,7 @@ def parse_arguments():
         valid_arguments = False
         
     try:
-        assert os.path.isdir(args.directory)
+        assert os.path.isdir(os.path.expanduser(args.directory))
     except AssertionError:
         print('Invalid Django project directory (%s).' % args.directory, file=sys.stderr)
         valid_arguments = False
