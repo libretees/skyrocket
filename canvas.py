@@ -47,12 +47,18 @@ def import_settings(args):
 def parse_arguments():
     valid_arguments = True
     parser = argparse.ArgumentParser(description='Provision Django application environments.')
-    parser.add_argument('--log', dest='loglevel', action='store', default='ERROR',
-                        help='set log level [DEBUG, INFO, WARNING, ERROR, CRITICAL] (default: ERROR)')
-    parser.add_argument('--project', dest='directory', action='store', default=os.getcwd(),
+    parser.add_argument('-p', '--project', dest='directory', action='store', default=os.getcwd(),
                         help='set Django project directory')
+    parser.add_argument('-a', '--account', dest='account_id', action='store',
+                        help='set AWS Account ID')
+    parser.add_argument('-id', '--id', dest='key_id', action='store',
+                        help='set AWS Access Key ID')
+    parser.add_argument('-k', '--key', dest='key', action='store',
+                        help='set AWS Account Secret Access Key')
+    parser.add_argument('-d', '--debug', dest='loglevel', action='store', default='ERROR',
+                        help='set log level [DEBUG, INFO, WARNING, ERROR, CRITICAL] (default: ERROR)')
     args = parser.parse_args()
-    
+
     try:
         assert args.loglevel.upper() in ['DEBUG', 'INFO', 'WARNING', 'ERROR', 'CRITICAL']
     except AssertionError:
@@ -80,9 +86,9 @@ def main():
     args = parse_arguments()
     configure_logger(args)
     settings = import_settings(args)
-    
+
     engine = settings.DATABASES['default']['ENGINE']
-    
+
     if engine not in ['django.db.backends.postgresql_psycopg2' \
                      ,'django.db.backends.mysql' \
                      ,'django.db.backends.sqlite3' \
