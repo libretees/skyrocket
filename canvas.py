@@ -1,9 +1,15 @@
+#!/usr/bin/env python
+"""canvas.py: Provision AWS environments for Django projects."""
+
 import os
 import sys
 import imp
 import logging
 import argparse
-#from importlib import import_module
+
+__author__ = 'Jared Contrascere'
+__copyright__ = 'Copyright 2015, LibreTees, LLC'
+__license__ = 'GPLv3'
 
 AWS_ACCOUNT_ID = os.environ.get('AWS_ACCOUNT_ID')
 AWS_ACCESS_KEY_ID = os.environ.get('AWS_ACCESS_KEY_ID')
