@@ -8,6 +8,7 @@ import logging
 import argparse
 import re
 import configparser
+import boto
 
 __author__ = 'Jared Contrascere'
 __copyright__ = 'Copyright 2015, LibreTees, LLC'
@@ -156,6 +157,12 @@ def main():
         sys.exit(1)
     else:
         logger.info('Provisioning database for engine (%s).' % engine)
+
+    logger.info('Connecting to the Amazon EC2 service.')
+    ec2 = boto.connect_ec2(aws_access_key_id=args.key_id,
+                           aws_secret_access_key=args.key)
+    ec2.get_all_zones()
+    logger.info('Connected to the Amazon EC2 service.')
 
 if __name__ == '__main__':
     main()
