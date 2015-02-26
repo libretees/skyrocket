@@ -6,6 +6,7 @@ import sys
 import imp
 import logging
 import argparse
+import re
 
 __author__ = 'Jared Contrascere'
 __copyright__ = 'Copyright 2015, LibreTees, LLC'
@@ -49,13 +50,13 @@ def parse_arguments():
     parser = argparse.ArgumentParser(description='Provision Django application environments.')
     parser.add_argument('-p', '--project', dest='directory', action='store', default=os.getcwd(),
                         help='set Django project directory')
-    parser.add_argument('-a', '--account', dest='account_id', action='store',
+    parser.add_argument('-aws', '--account-id', dest='account_id', action='store', default=os.environ.get('AWS_ACCOUNT_ID'),
                         help='set AWS Account ID')
-    parser.add_argument('-id', '--id', dest='key_id', action='store',
+    parser.add_argument('-id', '--key-id', dest='key_id', action='store', default=os.environ.get('AWS_ACCESS_KEY_ID'),
                         help='set AWS Access Key ID')
-    parser.add_argument('-k', '--key', dest='key', action='store',
+    parser.add_argument('-k', '--secret', dest='key', action='store', default=os.environ.get('AWS_SECRET_ACCESS_KEY'),
                         help='set AWS Account Secret Access Key')
-    parser.add_argument('-d', '--debug', dest='loglevel', action='store', default='ERROR',
+    parser.add_argument('-d', '--log', dest='loglevel', action='store', default='ERROR',
                         help='set log level [DEBUG, INFO, WARNING, ERROR, CRITICAL] (default: ERROR)')
     args = parser.parse_args()
 
@@ -70,8 +71,38 @@ def parse_arguments():
     except AssertionError:
         print('Invalid Django project directory (%s).' % args.directory, file=sys.stderr)
         valid_arguments = False
-        
+
+    try:
+        assert re.search(r'^\d{12}$', args.account_id)
+    except AssertionError:
+        if len(args.account_id):
+            print('AWS Account ID must be exactly 12 digits (%s).' % args.account_id, file=sys.stderr)
+        else:
+            print('AWS Account ID not specified.', file=sys.stderr)
+        valid_arguments = False
+
+    try:
+        assert re.search(r'^[A-Z0-9]{20}$', args.key_id, re.IGNORECASE)
+    except AssertionError:
+        if len(args.key_id):
+            print('AWS Access Key ID must contain 20 alphanumeric characters (%s).' \
+                  % args.key_id, file=sys.stderr)
+        else:
+            print('AWS Access Key ID not specified.', file=sys.stderr)
+        valid_arguments = False
+
+    try:
+        assert re.search(r'^[A-Z0-9/\+]{40}$', args.key, re.IGNORECASE)
+    except AssertionError:
+        if len(args.key):
+            print('AWS Account Secret Access Key must contain 40 alphanumeric characters and/or the following: /+ (%s).' \
+                  % args.key, file=sys.stderr)
+        else:
+            print('AWS Account Secret Access Key not specified.', file=sys.stderr)
+        valid_arguments = False
+
     if not valid_arguments:
+        print('Exiting...', file=sys.stderr)
         sys.exit(1)
         
     return args
@@ -97,8 +128,6 @@ def main():
         sys.exit(1)
     else:
         logger.info('Provisioning database for engine (%s)' % engine)
-
-
 
 if __name__ == "__main__":
     main()
