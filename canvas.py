@@ -13,10 +13,6 @@ __author__ = 'Jared Contrascere'
 __copyright__ = 'Copyright 2015, LibreTees, LLC'
 __license__ = 'GPLv3'
 
-AWS_ACCOUNT_ID = os.environ.get('AWS_ACCOUNT_ID')
-AWS_ACCESS_KEY_ID = os.environ.get('AWS_ACCESS_KEY_ID')
-AWS_SECRET_ACCESS_KEY = os.environ.get('AWS_SECRET_ACCESS_KEY')
-
 logger = logging.getLogger(__name__)
 
 def import_settings(args):
