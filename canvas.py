@@ -59,6 +59,8 @@ def parse_arguments():
                         help='set AWS Account Secret Access Key')
     parser.add_argument('-d', '--log', dest='loglevel', action='store', default='ERROR',
                         help='set log level [DEBUG, INFO, WARNING, ERROR, CRITICAL] (default: ERROR)')
+    parser.add_argument("--dry", dest='dry_run', action='store_true', default=False,
+                        help='perform a dry run')
     args = parser.parse_args()
 
     try:
@@ -161,8 +163,10 @@ def main():
     logger.info('Connecting to the Amazon EC2 service.')
     ec2 = boto.connect_ec2(aws_access_key_id=args.key_id,
                            aws_secret_access_key=args.key)
-    ec2.get_all_zones()
+    ec2.get_all_zones(dry_run=args.dry_run)
     logger.info('Connected to the Amazon EC2 service.')
+
+
 
 if __name__ == '__main__':
     main()
