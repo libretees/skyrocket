@@ -160,13 +160,16 @@ def main():
     else:
         logger.info('Provisioning database for engine (%s).' % engine)
 
-    logger.info('Connecting to the Amazon EC2 service.')
+    logger.info('Connecting to the Amazon Elastic Compute Cloud (Amazon EC2) service.')
     ec2 = boto.connect_ec2(aws_access_key_id=args.key_id,
                            aws_secret_access_key=args.key)
     ec2.get_all_zones(dry_run=args.dry_run)
     logger.info('Connected to the Amazon EC2 service.')
 
-
+    logger.info('Connecting to the Amazon Relational Database Service (Amazon RDS) service.')
+    rds = boto.connect_rds(aws_access_key_id=args.key_id,
+                           aws_secret_access_key=args.key)
+    logger.info('Connected to the Amazon RDS service.')
 
 if __name__ == '__main__':
     main()
