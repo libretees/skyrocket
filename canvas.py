@@ -7,6 +7,7 @@ import imp
 import logging
 import argparse
 import re
+import configparser
 
 __author__ = 'Jared Contrascere'
 __copyright__ = 'Copyright 2015, LibreTees, LLC'
@@ -20,28 +21,31 @@ logger = logging.getLogger(__name__)
 
 def import_settings(args):
     settings = None
-    try:
-        import_module('settings', os.environ['DJANGO_SETTINGS_MODULE'])
-        logger.debug('Django Settings Module loaded (%s)' % os.environ['DJANGO_SETTINGS_MODULE'])
-    except:
-        logger.debug('Django Settings Module could not be loaded from environment variable.')
+    if os.environ.get('DJANGO_SETTINGS_MODULE'):
+        try:
+            import_module('settings', os.environ['DJANGO_SETTINGS_MODULE'])
+            logger.debug('Django Settings Module loaded (%s).' % os.environ['DJANGO_SETTINGS_MODULE'])
+        except:
+            logger.debug('Django Settings Module could not be loaded from path given in environment variable.')
 
     project_directory = os.path.abspath(os.path.expanduser(args.directory))
     project_name = project_directory.split(os.sep)[-1]
     relative_path = os.path.join(os.path.relpath(project_directory, os.getcwd()), project_name, 'settings.py')
-    logger.info('Loading (%s)' % relative_path)
+    logger.info('Loading (%s).' % relative_path)
     try:
         imp.load_source('settings', relative_path)
         import settings
-        logger.debug('Django Settings Module loaded from file (%s)' % relative_path)
+        logger.debug('Django Settings Module loaded from file (%s).' % relative_path)
     except (FileNotFoundError, ImportError):
-        logger.debug('Django Settings Module could not be loaded from file (%s)' % relative_path)
-    
+        logger.debug('Django Settings Module could not be loaded from file (%s).' % relative_path)
+
     try:
         assert settings
     except AssertionError:
         logger.error('Django Settings Module failed to import.')
-        sys.exit(1)
+        if __name__ == '__main__':
+            logger.error('Exiting...')
+            sys.exit(1)
 
     return settings
 
@@ -63,48 +67,77 @@ def parse_arguments():
     try:
         assert args.loglevel.upper() in ['DEBUG', 'INFO', 'WARNING', 'ERROR', 'CRITICAL']
     except AssertionError:
-        print('Invalid log option (%s).' % args.loglevel, file=sys.stderr)
+        print('ERROR:', __name__, 'Invalid log option (%s).' % args.loglevel, file=sys.stderr, sep='')
         valid_arguments = False
-        
+    configure_logger(args)
+
     try:
         assert os.path.isdir(os.path.expanduser(args.directory))
+        logger.debug('Django project directory argument validated (%s).' % args.directory)
     except AssertionError:
-        print('Invalid Django project directory (%s).' % args.directory, file=sys.stderr)
+        logger.error('Invalid Django project directory (%s).' % args.directory)
         valid_arguments = False
 
     try:
         assert re.search(r'^\d{12}$', args.account_id)
+        logger.debug('AWS Account ID argument validated (%s).' % args.account_id)
     except AssertionError:
         if len(args.account_id):
-            print('AWS Account ID must be exactly 12 digits (%s).' % args.account_id, file=sys.stderr)
+            logger.error('AWS Account ID must be exactly 12 digits (%s).' % args.account_id)
         else:
-            print('AWS Account ID not specified.', file=sys.stderr)
+            logger.error('AWS Account ID not specified.')
         valid_arguments = False
 
+    config_path = None
+    if os.environ.get('BOTO_CONFIG'):
+        config_path = os.path.expanduser(os.environ.get('BOTO_CONFIG'))
+    elif os.path.exists(os.path.expanduser('~/.boto')):
+        config_path = os.path.expanduser('~/.boto')
+    elif os.path.exists(os.path.expanduser('~/.aws/credentials')):
+        config_path = os.path.expanduser('~/.aws/credentials')
+    elif os.path.exists('/etc/boto.cfg'):
+        config_path = '/etc/boto.cfg'
+
+    if config_path:
+        config = configparser.ConfigParser()
+        config.sections()
+        try:
+            logger.info('Reading configuration file (%s).' % config_path)
+            config.read(config_path)
+            key_id = config['Credentials']['aws_access_key_id']
+            key = config['Credentials']['aws_secret_access_key']
+        except:
+            logger.error('Could not read configuration file (%s).' % config_path)
+
     try:
+        args.key_id = args.key_id or key_id
         assert re.search(r'^[A-Z0-9]{20}$', args.key_id, re.IGNORECASE)
+        logger.debug('AWS Access Key ID argument validated (%s).' % args.key_id)
     except AssertionError:
         if len(args.key_id):
-            print('AWS Access Key ID must contain 20 alphanumeric characters (%s).' \
-                  % args.key_id, file=sys.stderr)
+            logger.error('AWS Access Key ID must contain 20 alphanumeric characters (%s).' % args.key_id)
         else:
-            print('AWS Access Key ID not specified.', file=sys.stderr)
+            logger.error('AWS Access Key ID not specified.')
         valid_arguments = False
 
     try:
+        args.key = args.key or key
         assert re.search(r'^[A-Z0-9/\+]{40}$', args.key, re.IGNORECASE)
+        logger.debug('AWS Account Secret Access Key argument validated.')
     except AssertionError:
         if len(args.key):
-            print('AWS Account Secret Access Key must contain 40 alphanumeric characters and/or the following: /+ (%s).' \
-                  % args.key, file=sys.stderr)
+            logger.error('AWS Account Secret Access Key must contain 40 alphanumeric characters and/or the following: /+ (%s).' \
+                         % args.key)
         else:
-            print('AWS Account Secret Access Key not specified.', file=sys.stderr)
+            logger.error('AWS Account Secret Access Key not specified.')
         valid_arguments = False
 
     if not valid_arguments:
-        print('Exiting...', file=sys.stderr)
-        sys.exit(1)
-        
+        logger.error('Invalid arguments given.')
+        if __name__ == '__main__':
+            logger.error('Exiting...')
+            sys.exit(1)
+
     return args
 
 def configure_logger(args):
@@ -115,7 +148,6 @@ def configure_logger(args):
 
 def main():
     args = parse_arguments()
-    configure_logger(args)
     settings = import_settings(args)
 
     engine = settings.DATABASES['default']['ENGINE']
@@ -124,10 +156,10 @@ def main():
                      ,'django.db.backends.mysql' \
                      ,'django.db.backends.sqlite3' \
                      ,'django.db.backends.oracle']:
-        logger.error('Unknown database engine (%s)' % engine, exc_info=True)
+        logger.error('Unknown database engine (%s).' % engine, exc_info=True)
         sys.exit(1)
     else:
-        logger.info('Provisioning database for engine (%s)' % engine)
+        logger.info('Provisioning database for engine (%s).' % engine)
 
-if __name__ == "__main__":
+if __name__ == '__main__':
     main()
