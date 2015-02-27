@@ -163,13 +163,24 @@ def main():
     logger.info('Connecting to the Amazon Elastic Compute Cloud (Amazon EC2) service.')
     ec2 = boto.connect_ec2(aws_access_key_id=args.key_id,
                            aws_secret_access_key=args.key)
-    ec2.get_all_zones(dry_run=args.dry_run)
     logger.info('Connected to the Amazon EC2 service.')
 
     logger.info('Connecting to the Amazon Relational Database Service (Amazon RDS) service.')
     rds = boto.connect_rds(aws_access_key_id=args.key_id,
                            aws_secret_access_key=args.key)
     logger.info('Connected to the Amazon RDS service.')
+
+    sg = rds.create_dbsecurity_group('group1', 'My first DB Security group')
+    pg = rds.create_parameter_group('paramgrp1', description='My first parameter group')
+    pg.get_params()
+
+    inst = rds.create_dbinstance(id='dbinst1', allocated_storage=10,
+                                 instance_class='db.m1.small', master_username='mitch',
+                                 master_password='topsecret', param_group='paramgrp1',
+                                 security_groups=['group1'])
+
+    rs = rds.get_all_dbinstances()
+    print(rs[0].status)
 
 if __name__ == '__main__':
     main()
