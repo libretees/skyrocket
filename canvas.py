@@ -194,9 +194,9 @@ def main():
         'django.db.backends.oracle':              'oracle-se1-11.2',
     }
     parameter_group_name = '-'.join(['pg', PROJECT_NAME.lower(), args.environment.lower(), 'db'])
-    pg = rds.layer1.create_parameter_group(parameter_group_name,                                     #name
-                                           engine=aws_engines[django_engine],                        #engine
-                                           description=' '.join([PROJECT_NAME, ' parameter group'])) #description
+    pg = rds.create_parameter_group(parameter_group_name,                                     #name
+                                    engine=aws_engines[django_engine],                        #engine
+                                    description=' '.join([PROJECT_NAME, ' parameter group'])) #description
     pg.get_params()
     for key in pg.keys():
         print(key)
