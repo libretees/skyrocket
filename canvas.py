@@ -14,7 +14,9 @@ __author__ = 'Jared Contrascere'
 __copyright__ = 'Copyright 2015, LibreTees, LLC'
 __license__ = 'GPLv3'
 
+PROJECT_NAME = None
 logger = logging.getLogger(__name__)
+
 
 def import_settings(args):
     settings = None
@@ -26,8 +28,8 @@ def import_settings(args):
             logger.debug('Django Settings Module could not be loaded from path given in environment variable.')
 
     project_directory = os.path.abspath(os.path.expanduser(args.directory))
-    project_name = project_directory.split(os.sep)[-1]
-    relative_path = os.path.join(os.path.relpath(project_directory, os.getcwd()), project_name, 'settings.py')
+    PROJECT_NAME = project_directory.split(os.sep)[-1]
+    relative_path = os.path.join(os.path.relpath(project_directory, os.getcwd()), PROJECT_NAME, 'settings.py')
     logger.info('Loading (%s).' % relative_path)
     try:
         imp.load_source('settings', relative_path)
@@ -170,8 +172,8 @@ def main():
                            aws_secret_access_key=args.key)
     logger.info('Connected to the Amazon RDS service.')
 
-    sg = rds.create_dbsecurity_group('group1', 'My first DB Security group')
-    pg = rds.create_parameter_group('paramgrp1', description='My first parameter group')
+    sg = rds.create_dbsecurity_group('group1', ' '.join([PROJECT_NAME, 'DB Security group']))
+    pg = rds.create_parameter_group('paramgrp1', description=' '.join([PROJECT_NAME, ' parameter group']))
     pg.get_params()
 
     inst = rds.create_dbinstance(id='dbinst1', allocated_storage=10,
