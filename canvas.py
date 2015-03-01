@@ -17,8 +17,8 @@ __license__ = 'GPLv3'
 PROJECT_NAME = None
 logger = logging.getLogger(__name__)
 
-
 def import_settings(args):
+    global PROJECT_NAME
     settings = None
     if os.environ.get('DJANGO_SETTINGS_MODULE'):
         try:
@@ -53,6 +53,8 @@ def parse_arguments():
     parser = argparse.ArgumentParser(description='Provision Django application environments.')
     parser.add_argument('-p', '--project', dest='directory', action='store', default=os.getcwd(),
                         help='set Django project directory')
+    parser.add_argument('-env', '--environment', dest='environment', action='store', default='STAGING',
+                        help='set desired deployment environment [STAGING, PRODUCTION]\n(default: staging)')
     parser.add_argument('-aws', '--account-id', dest='account_id', action='store', default=os.environ.get('AWS_ACCOUNT_ID'),
                         help='set AWS Account ID')
     parser.add_argument('-id', '--key-id', dest='key_id', action='store', default=os.environ.get('AWS_ACCESS_KEY_ID'),
@@ -61,16 +63,26 @@ def parse_arguments():
                         help='set AWS Account Secret Access Key')
     parser.add_argument('-d', '--log', dest='loglevel', action='store', default='ERROR',
                         help='set log level [DEBUG, INFO, WARNING, ERROR, CRITICAL] (default: ERROR)')
-    parser.add_argument("--dry", dest='dry_run', action='store_true', default=False,
+    parser.add_argument('--dry', dest='dry_run', action='store_true', default=False,
                         help='perform a dry run')
     args = parser.parse_args()
 
     try:
         assert args.loglevel.upper() in ['DEBUG', 'INFO', 'WARNING', 'ERROR', 'CRITICAL']
+        if args.loglevel.upper() == 'DEBUG':
+            print('DEBUG:', __name__, ':Log argument validated (%s).' % args.loglevel, sep='')
     except AssertionError:
-        print('ERROR:', __name__, 'Invalid log option (%s).' % args.loglevel, file=sys.stderr, sep='')
+        print('ERROR:', __name__, ':Invalid log option (%s).' % args.loglevel, file=sys.stderr, sep='')
         valid_arguments = False
     configure_logger(args)
+
+    try:
+        assert args.environment.upper() in ['STAGING', 'PROD', 'PRODUCTION']
+        if args.environment.upper() == 'PRODUCTION': args.environment = 'PROD'
+        logger.debug('Deployment environment argument validated (%s).' % args.environment)
+    except AssertionError:
+        logger.error('Invalid deployment environment (%s).' % args.environment)
+        valid_arguments = False
 
     try:
         assert os.path.isdir(os.path.expanduser(args.directory))
@@ -151,16 +163,16 @@ def main():
     args = parse_arguments()
     settings = import_settings(args)
 
-    engine = settings.DATABASES['default']['ENGINE']
+    django_engine = settings.DATABASES['default']['ENGINE']
 
-    if engine not in ['django.db.backends.postgresql_psycopg2' \
-                     ,'django.db.backends.mysql' \
-                     ,'django.db.backends.sqlite3' \
-                     ,'django.db.backends.oracle']:
-        logger.error('Unknown database engine (%s).' % engine, exc_info=True)
+    if django_engine not in ['django.db.backends.postgresql_psycopg2' \
+                            ,'django.db.backends.mysql' \
+                            ,'django.db.backends.sqlite3' \
+                            ,'django.db.backends.oracle']:
+        logger.error('Unknown database engine (%s).' % django_engine, exc_info=True)
         sys.exit(1)
     else:
-        logger.info('Provisioning database for engine (%s).' % engine)
+        logger.info('Provisioning RDS instance for Django engine (%s).' % django_engine)
 
     logger.info('Connecting to the Amazon Elastic Compute Cloud (Amazon EC2) service.')
     ec2 = boto.connect_ec2(aws_access_key_id=args.key_id,
@@ -172,17 +184,30 @@ def main():
                            aws_secret_access_key=args.key)
     logger.info('Connected to the Amazon RDS service.')
 
-    sg = rds.create_dbsecurity_group('group1', ' '.join([PROJECT_NAME, 'DB Security group']))
-    pg = rds.create_parameter_group('paramgrp1', description=' '.join([PROJECT_NAME, ' parameter group']))
+    security_group_name = '-'.join(['gp', PROJECT_NAME.lower(), args.environment.lower(), 'db'])
+    sg = rds.create_dbsecurity_group(security_group_name,                           #name
+                                     ' '.join([PROJECT_NAME, 'DB Security group'])) #engine
+
+    aws_engines = {
+        'django.db.backends.postgresql_psycopg2': 'postgres9.3',
+        'django.db.backends.mysql':               'MySQL5.6',
+        'django.db.backends.oracle':              'oracle-se1-11.2',
+    }
+    parameter_group_name = '-'.join(['pg', PROJECT_NAME.lower(), args.environment.lower(), 'db'])
+    pg = rds.layer1.create_parameter_group(parameter_group_name,                                     #name
+                                           engine=aws_engines[django_engine],                        #engine
+                                           description=' '.join([PROJECT_NAME, ' parameter group'])) #description
     pg.get_params()
+    for key in pg.keys():
+        print(key)
 
-    inst = rds.create_dbinstance(id='dbinst1', allocated_storage=10,
-                                 instance_class='db.m1.small', master_username='mitch',
-                                 master_password='topsecret', param_group='paramgrp1',
-                                 security_groups=['group1'])
+    # inst = rds.create_dbinstance(id='dbinst1', allocated_storage=10,
+    #                              instance_class='db.m1.small', master_username='mitch',
+    #                              master_password='topsecret', param_group=parameter_group_name,
+    #                              security_groups=[security_group_name])
 
-    rs = rds.get_all_dbinstances()
-    print(rs[0].status)
+    #rs = rds.get_all_dbinstances()
+    #print(rs[0].status)
 
 if __name__ == '__main__':
     main()
