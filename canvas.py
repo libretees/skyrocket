@@ -174,40 +174,70 @@ def main():
     else:
         logger.info('Provisioning RDS instance for Django engine (%s).' % django_engine)
 
+    logger.info('Connecting to the Amazon Virtual Private Cloud (Amazon VPC) service.')
+    vpc_connection = boto.connect_vpc(aws_access_key_id=args.key_id,
+                                      aws_secret_access_key=args.key)
+    logger.info('Connected to the Amazon VPC service.')
+
+    vpcs = vpc_connection.get_all_vpcs()
+    default_vpc = vpcs[0]
+
+    default_subnets = vpc_connection.get_all_subnets(filters={
+                                                         'vpcId': default_vpc.id
+                                                     })
+    # print('HERE!'*100, default_vpc.id)
+    # for subnet in default_subnets:
+    #     print(type(subnet), subnet, subnet.id)
+
     logger.info('Connecting to the Amazon Elastic Compute Cloud (Amazon EC2) service.')
     ec2 = boto.connect_ec2(aws_access_key_id=args.key_id,
                            aws_secret_access_key=args.key)
     logger.info('Connected to the Amazon EC2 service.')
 
     logger.info('Connecting to the Amazon Relational Database Service (Amazon RDS) service.')
-    rds = boto.connect_rds(aws_access_key_id=args.key_id,
-                           aws_secret_access_key=args.key)
+    rds = boto.connect_rds2(aws_access_key_id=args.key_id,
+                            aws_secret_access_key=args.key)
     logger.info('Connected to the Amazon RDS service.')
 
-    security_group_name = '-'.join(['gp', PROJECT_NAME.lower(), args.environment.lower(), 'db'])
-    sg = rds.create_dbsecurity_group(security_group_name,                           #name
-                                     ' '.join([PROJECT_NAME, 'DB Security group'])) #engine
+    # Not required for Amazon VPC
+    # db_security_group_name = '-'.join(['gp', PROJECT_NAME.lower(), args.environment.lower(), 'db'])
+    # db_security_group_description = ' '.join([PROJECT_NAME, 'DB Security Group'])
+    # sg = rds.create_db_security_group(db_security_group_name,        #db_security_group_name
+    #                                   db_security_group_description) #db_security_group_description
 
-    aws_engines = {
+    # Affected by boto Issue #2677 : https://github.com/boto/boto/issues/2677
+    aws_engine = {
         'django.db.backends.postgresql_psycopg2': 'postgres9.3',
         'django.db.backends.mysql':               'MySQL5.6',
         'django.db.backends.oracle':              'oracle-se1-11.2',
     }
-    parameter_group_name = '-'.join(['pg', PROJECT_NAME.lower(), args.environment.lower(), 'db'])
-    pg = rds.create_parameter_group(parameter_group_name,                                     #name
-                                    engine=aws_engines[django_engine],                        #engine
-                                    description=' '.join([PROJECT_NAME, ' parameter group'])) #description
-    pg.get_params()
-    for key in pg.keys():
-        print(key)
+    db_parameter_group_name = '-'.join(['pg', PROJECT_NAME.lower(), args.environment.lower(), 'db'])
+    pg = rds.create_db_parameter_group(db_parameter_group_name,                                 #db_parameter_group_name
+                                       aws_engine[django_engine],                               #db_parameter_group_family
+                                       description=' '.join([PROJECT_NAME, 'Parameter Group'])) #description
 
-    # inst = rds.create_dbinstance(id='dbinst1', allocated_storage=10,
-    #                              instance_class='db.m1.small', master_username='mitch',
-    #                              master_password='topsecret', param_group=parameter_group_name,
-    #                              security_groups=[security_group_name])
+    db_subnet_group_name = '-'.join(['net', PROJECT_NAME.lower(), args.environment.lower(), 'db'])
+    rds.create_db_subnet_group(db_subnet_group_name,                       #db_subnet_group_name
+                              ' '.join([PROJECT_NAME, 'DB Subnet Group']), #db_subnet_group_description
+                              [subnet.id for subnet in default_subnets])   #subnet_ids
 
-    #rs = rds.get_all_dbinstances()
-    #print(rs[0].status)
+    aws_engine = {
+        'django.db.backends.postgresql_psycopg2': 'postgres',
+        'django.db.backends.mysql':               'MySQL',
+        'django.db.backends.oracle':              'oracle-se1',
+    }
+    inst = rds.create_db_instance('dbinst1',                 #db_instance_identifier
+                                  5,                         #allocated_storage
+                                  'db.t2.micro',             #db_instance_class
+                                  aws_engine[django_engine], #engine
+                                  'zolozolo',                #master_username
+                                  'zolozolo',                #master_user_password
+                                  #db_security_groups=[db_security_group_name],
+                                  db_subnet_group_name=db_subnet_group_name,
+                                  db_parameter_group_name=db_parameter_group_name)
+
+    rs = rds.describe_db_instances()
+    print(type(rs), rs)
 
 if __name__ == '__main__':
     main()
