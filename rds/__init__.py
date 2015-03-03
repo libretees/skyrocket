@@ -16,16 +16,6 @@ def connect_rds():
     
     return rds
 
-def provision_db():
-    if DJANGO_ENGINE not in ['django.db.backends.postgresql_psycopg2' \
-                            ,'django.db.backends.mysql' \
-                            ,'django.db.backends.sqlite3' \
-                            ,'django.db.backends.oracle']:
-        logger.error('Unknown database engine (%s).' % DJANGO_ENGINE, exc_info=True)
-        sys.exit(1)
-    else:
-        logger.info('Provisioning RDS instance for Django engine (%s).' % DJANGO_ENGINE)
-        
 def create_db_parameter_group(rds):
     # Affected by boto Issue #2677 : https://github.com/boto/boto/issues/2677
     aws_engine = {
@@ -47,6 +37,15 @@ def create_db_subnet_group(rds, default_subnets):
     return subnet
 
 def create_db_instance(rds, db_parameter_group, db_subnet_group):
+    if DJANGO_ENGINE not in ['django.db.backends.postgresql_psycopg2' \
+                            ,'django.db.backends.mysql' \
+                            ,'django.db.backends.sqlite3' \
+                            ,'django.db.backends.oracle']:
+        logger.error('Unknown database engine (%s).' % DJANGO_ENGINE, exc_info=True)
+        sys.exit(1)
+    else:
+        logger.info('Provisioning RDS instance for Django engine (%s).' % DJANGO_ENGINE)
+
     aws_engine = {
         'django.db.backends.postgresql_psycopg2': 'postgres',
         'django.db.backends.mysql':               'MySQL',
