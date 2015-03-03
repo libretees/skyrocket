@@ -7,6 +7,7 @@ import logging
 import boto
 import core
 import vpc
+import ec2
 
 __author__ = 'Jared Contrascere'
 __copyright__ = 'Copyright 2015, LibreTees, LLC'
@@ -28,6 +29,7 @@ def main():
         logger.info('Provisioning RDS instance for Django engine (%s).' % django_engine)
 
     vpc_connection = vpc.connect_vpc()
+    ec2_connection = ec2.connect_ec2()
 
     vpcs = vpc_connection.get_all_vpcs()
     default_vpc = vpcs[0]
@@ -38,10 +40,7 @@ def main():
     # for subnet in default_subnets:
     #     print(type(subnet), subnet, subnet.id)
 
-    logger.info('Connecting to the Amazon Elastic Compute Cloud (Amazon EC2) service.')
-    ec2 = boto.connect_ec2(aws_access_key_id=core.args.key_id,
-                           aws_secret_access_key=core.args.key)
-    logger.info('Connected to the Amazon EC2 service.')
+
 
     logger.info('Connecting to the Amazon Relational Database Service (Amazon RDS) service.')
     rds = boto.connect_rds2(aws_access_key_id=core.args.key_id,
