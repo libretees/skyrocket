@@ -2,7 +2,6 @@
 # -*- coding: utf-8 -*-
 """canvas.py: Provision AWS environments for Django projects."""
 
-import sys
 import logging
 import boto
 import vpc
