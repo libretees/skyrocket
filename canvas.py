@@ -3,7 +3,6 @@
 """canvas.py: Provision AWS environments for Django projects."""
 
 import logging
-import boto
 import vpc
 import ec2
 import rds
