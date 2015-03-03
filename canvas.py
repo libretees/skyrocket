@@ -6,6 +6,7 @@ import sys
 import logging
 import boto
 import core
+import vpc
 
 __author__ = 'Jared Contrascere'
 __copyright__ = 'Copyright 2015, LibreTees, LLC'
@@ -26,10 +27,7 @@ def main():
     else:
         logger.info('Provisioning RDS instance for Django engine (%s).' % django_engine)
 
-    logger.info('Connecting to the Amazon Virtual Private Cloud (Amazon VPC) service.')
-    vpc_connection = boto.connect_vpc(aws_access_key_id=core.args.key_id,
-                                      aws_secret_access_key=core.args.key)
-    logger.info('Connected to the Amazon VPC service.')
+    vpc_connection = vpc.connect_vpc()
 
     vpcs = vpc_connection.get_all_vpcs()
     default_vpc = vpcs[0]
