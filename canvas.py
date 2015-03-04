@@ -47,14 +47,12 @@ def main():
     if not bucket:
         try:
             logger.info('Creating bucket (%s).' % s3_bucket_name)
-            bucket = s3_connection.create_bucket(s3_bucket_name, location=Location.DEFAULT)
+            bucket = s3_connection.create_bucket(s3_bucket_name, location=Location.DEFAULT, policy='private')
         except:
             pass
 
-    k = Key(bucket)
-    k.key = 'archive'
-    k.set_contents_from_filename(archive_name)
-    print(bucket)
+    key = bucket.new_key(archive_name)
+    key.set_contents_from_filename(archive_name, policy='private')
 
     # pg = rds.create_db_parameter_group(rds_connection)
     # subnet = rds.create_db_subnet_group(rds_connection, default_subnets)
