@@ -3,9 +3,11 @@
 """canvas.py: Provision AWS environments for Django projects."""
 
 import logging
+import core
 import vpc
 import ec2
 import rds
+import s3
 
 __author__ = 'Jared Contrascere'
 __copyright__ = 'Copyright 2015, LibreTees, LLC'
@@ -18,22 +20,25 @@ def main():
     vpc_connection = vpc.connect_vpc()
     ec2_connection = ec2.connect_ec2()
     rds_connection = rds.connect_rds()
+    s3_connection = s3.connect_s3()
 
-    vpcs = vpc_connection.get_all_vpcs()
-    default_vpc = vpcs[0]
-    default_subnets = vpc_connection.get_all_subnets(filters={
-                                                         'vpcId': default_vpc.id
-                                                     })
+    # s3.make_tarfile('.'.join([s3.PROJECT_NAME, 'tar', 'gz']), s3.PROJECT_DIRECTORY)
 
-    pg = rds.create_db_parameter_group(rds_connection)
-    subnet = rds.create_db_subnet_group(rds_connection, default_subnets)
+    # vpcs = vpc_connection.get_all_vpcs()
+    # default_vpc = vpcs[0]
+    # default_subnets = vpc_connection.get_all_subnets(filters={
+    #                                                      'vpcId': default_vpc.id
+    #                                                  })
 
-    db = rds.create_db_instance(rds_connection,
-                                pg,
-                                subnet)
+    # pg = rds.create_db_parameter_group(rds_connection)
+    # subnet = rds.create_db_subnet_group(rds_connection, default_subnets)
 
-    rs = rds_connection.describe_db_instances()
-    print(type(rs), rs)
+    # db = rds.create_db_instance(rds_connection,
+    #                             pg,
+    #                             subnet)
+
+    # rs = rds_connection.describe_db_instances()
+    # print(type(rs), rs)
 
 if __name__ == '__main__':
     main()
