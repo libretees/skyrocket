@@ -9,6 +9,8 @@ import vpc
 import ec2
 import rds
 import s3
+from boto.s3.connection import Location
+from boto.s3.key import Key
 
 __author__ = 'Jared Contrascere'
 __copyright__ = 'Copyright 2015, LibreTees, LLC'
@@ -29,15 +31,30 @@ def main():
                                                          'vpcId': default_vpc.id
                                                      })
 
-    ec2_instance_name = '-'.join(['ec2', core.PROJECT_NAME.lower(), core.args.environment.lower(), '%x' % random.randrange(2**32)])
-    reservation = ec2_connection.run_instances('ami-9a562df2',
-                                               instance_type='t2.micro',
-                                               subnet_id=default_subnets[0].id)
+    # ec2_instance_name = '-'.join(['ec2', core.PROJECT_NAME.lower(), core.args.environment.lower(), '%x' % random.randrange(2**32)])
+    # reservation = ec2_connection.run_instances('ami-9a562df2',
+    #                                           instance_type='t2.micro',
+    #                                           subnet_id=default_subnets[0].id)
 
-    instance = reservation.instances[-1]
-    ec2_connection.create_tags([instance.id], {"Name": ec2_instance_name})
+    # instance = reservation.instances[-1]
+    # ec2_connection.create_tags([instance.id], {"Name": ec2_instance_name})
 
-    # s3.make_tarfile('.'.join([s3.PROJECT_NAME, 'tar', 'gz']), s3.PROJECT_DIRECTORY)
+    archive_name = '.'.join([s3.PROJECT_NAME, 'tar', 'gz'])
+    s3.make_tarfile(archive_name, s3.PROJECT_DIRECTORY)
+
+    s3_bucket_name = '-'.join(['s3', core.PROJECT_NAME.lower(), core.args.environment.lower(), '%x' % random.randrange(2**32)])
+    bucket = s3_connection.lookup(s3_bucket_name)
+    if not bucket:
+        try:
+            logger.info('Creating bucket (%s).' % s3_bucket_name)
+            bucket = s3_connection.create_bucket(s3_bucket_name, location=Location.DEFAULT)
+        except:
+            pass
+
+    k = Key(bucket)
+    k.key = 'archive'
+    k.set_contents_from_filename(archive_name)
+    print(bucket)
 
     # pg = rds.create_db_parameter_group(rds_connection)
     # subnet = rds.create_db_subnet_group(rds_connection, default_subnets)
