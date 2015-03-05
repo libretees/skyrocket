@@ -20,12 +20,13 @@ __license__ = 'GPLv3'
 
 logger = logging.getLogger(__name__)
 
-def get_script(region, s3bucket, s3object, filename='user-data.sh'):
+def get_script(region, s3bucket, s3object, s3object2, filename='user-data.sh'):
     template = open(filename).read()
     return Template(template).substitute(
         region=region,
         s3bucket=s3bucket,
         s3object=s3object,
+        s3object2=s3object2
     )
 
 def main():
@@ -44,6 +45,9 @@ def main():
     archive_name = '.'.join([s3.PROJECT_NAME, 'tar', 'gz'])
     s3.make_tarfile(archive_name, s3.PROJECT_DIRECTORY)
 
+    bootstrap_archive_name = '.'.join(['configure', s3.PROJECT_NAME, 'tar', 'gz'])
+    s3.make_tarfile(bootstrap_archive_name, 'deploy')
+
     s3_bucket_name = '-'.join(['s3', core.PROJECT_NAME.lower(), core.args.environment.lower(), '%x' % random.randrange(2**32)])
     lifecycle_config = boto.s3.lifecycle.Lifecycle()
     lifecycle_config.add_rule(status='Enabled', expiration=1)
@@ -56,6 +60,8 @@ def main():
             logger.info('Created bucket (%s).' % s3_bucket_name)
             key = bucket.new_key(archive_name)
             key.set_contents_from_filename(archive_name, policy='private')
+            key = bucket.new_key(bootstrap_archive_name)
+            key.set_contents_from_filename(bootstrap_archive_name, policy='private')
         except:
             print(e)
 
@@ -67,9 +73,10 @@ def main():
             "Action": [
                 "s3:GetObject"
             ],
-            "Resource": ["arn:aws:s3:::%s/%s"]
+            "Resource": ["arn:aws:s3:::%s/%s",
+                         "arn:aws:s3:::%s/%s"]
         }]
-    }""" % (s3_bucket_name, archive_name)
+    }""" % (s3_bucket_name, archive_name, s3_bucket_name, bootstrap_archive_name)
 
     logger.info('Creating instance profile (%s).' % 'myinstanceprofile')
 
@@ -94,7 +101,7 @@ def main():
                                                subnet_id=default_subnets[0].id,
                                                instance_profile_name='myinstanceprofile',
                                                key_name='kp-com-libretees-dev',
-                                               user_data=get_script('us-east-1', s3_bucket_name, archive_name))
+                                               user_data=get_script('us-east-1', s3_bucket_name, archive_name, bootstrap_archive_name))
 
     instance = reservation.instances[-1]
     ec2_connection.create_tags([instance.id], {"Name": ec2_instance_name})

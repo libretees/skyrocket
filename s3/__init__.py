@@ -21,5 +21,5 @@ def connect_s3():
 def make_tarfile(output_filename, source_dir):
     logger.info('Archiving directory (%s).' % source_dir)
     with tarfile.open(output_filename, "w:gz") as tar:
-        tar.add(source_dir, arcname=os.path.basename(source_dir))
+        tar.add(source_dir, arcname='.')
     logger.info('Created gzipped tarball (%s).' % output_filename)
