@@ -100,18 +100,19 @@ def main():
     sg.authorize('tcp', from_port=80, to_port=80, cidr_ip='0.0.0.0/0')
     sg.authorize('tcp', from_port=443, to_port=443, cidr_ip='0.0.0.0/0')
     ec2_connection.revoke_security_group_egress(sg.id, -1, from_port=0, to_port=65535, cidr_ip='0.0.0.0/0')
+    ec2_connection.authorize_security_group_egress(sg.id, 'tcp', from_port=53, to_port=53, cidr_ip='0.0.0.0/0')
+    ec2_connection.authorize_security_group_egress(sg.id, 'udp', from_port=53, to_port=53, cidr_ip='0.0.0.0/0')
+    ec2_connection.authorize_security_group_egress(sg.id, 'tcp', from_port=80, to_port=80, cidr_ip='0.0.0.0/0')
     ec2_connection.authorize_security_group_egress(sg.id, 'tcp', from_port=443, to_port=443, cidr_ip='0.0.0.0/0')
-    for rule in sg.rules:
-        print('rule:', rule)
 
     ec2_instance_name = '-'.join(['ec2', core.PROJECT_NAME.lower(), core.args.environment.lower(), '%x' % random.randrange(2**32)])
     logger.info('Creating EC2 Instance (%s).' % ec2_instance_name)
     reservation = ec2_connection.run_instances('ami-9a562df2',
                                                instance_type='t2.micro',
-                                               #security_groups = ['gp-com-libretees-dev'],
+                                               security_group_ids = [sg.id],
                                                subnet_id=default_subnets[0].id,
                                                instance_profile_name='myinstanceprofile',
-                                               key_name='kp-com-libretees-dev',
+                                               #key_name='kp-com-libretees-dev',
                                                user_data=get_script('us-east-1', s3_bucket_name, archive_name, bootstrap_archive_name))
 
     instance = reservation.instances[-1]
