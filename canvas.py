@@ -54,16 +54,17 @@ def main():
     bucket = s3_connection.lookup(s3_bucket_name)
     if not bucket:
         try:
-            logger.info('Creating bucket (%s).' % s3_bucket_name)
+            logger.info('Creating S3 bucket (%s).' % s3_bucket_name)
+            bucket = s3_connection.create_bucket(s3_bucket_name, location=boto.s3.connection.Location.DEFAULT, policy='private')
             bucket = s3_connection.create_bucket(s3_bucket_name, location=boto.s3.connection.Location.DEFAULT, policy='private')
             bucket.configure_lifecycle(lifecycle_config)
-            logger.info('Created bucket (%s).' % s3_bucket_name)
+            logger.info('Created S3 bucket (%s).' % s3_bucket_name)
             key = bucket.new_key(archive_name)
             key.set_contents_from_filename(archive_name, policy='private')
             key = bucket.new_key(bootstrap_archive_name)
             key.set_contents_from_filename(bootstrap_archive_name, policy='private')
-        except:
-            print(e)
+        except boto.exception.S3CreateError as error:
+            logger.error('Couldn\'t create S3 bucket (%s) due to Error %s: %s.' % (s3_bucket_name, error.status, error.reason))
 
     iam_connection = iam.connect_iam()
     policy = """{
