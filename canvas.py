@@ -67,6 +67,16 @@ def main():
             logger.error('Couldn\'t create S3 bucket (%s) due to Error %s: %s.' % (s3_bucket_name, error.status, error.reason))
 
     iam_connection = iam.connect_iam()
+
+    cert_name = '-'.join(['crt', core.PROJECT_NAME.lower(), core.args.environment.lower()])
+    with open('public-key.crt', 'r') as cert_file:
+        cert_body=cert_file.read()
+    with open('private-key.pem", 'r') as private_key_file:
+        private_key=private_key_file.read()
+    with open('certificate-chain.pem', 'r') as cert_chain_file:
+        cert_chain=cert_chain_file.read()
+    iam_connection.upload_server_cert(cert_name, cert_body, private_key, cert_chain)
+
     policy = """{
         "Version": "2012-10-17",
         "Statement": [{
@@ -120,8 +130,8 @@ def main():
     ec2_connection.create_tags([instance.id], {"Name": ec2_instance_name})
     logger.info('Created EC2 Instance (%s).' % ec2_instance_name)
 
-    #curl http://169.254.169.254/latest/meta-data/iam/security-credentials/myrole
-    #aws s3 cp --region us-east-1 s3://s3-gossamer-staging-faddde2b/gossamer.tar.gz gossamer.tar.gz
+    # curl http://169.254.169.254/latest/meta-data/iam/security-credentials/myrole
+    # aws s3 cp --region us-east-1 s3://s3-gossamer-staging-faddde2b/gossamer.tar.gz gossamer.tar.gz
 
     # pg = rds.create_db_parameter_group(rds_connection)
     # subnet = rds.create_db_subnet_group(rds_connection, default_subnets)
