@@ -1,3 +1,9 @@
+# Project-specific files
+public-key.crt
+private-key.pem
+certificate-chain.pem
+*.tar.gz
+
 # Vim temporary and swap files
 *~
 *.swp
