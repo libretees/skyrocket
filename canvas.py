@@ -66,7 +66,7 @@ def main():
 
         # Ensure that netmask is compatible with Amazon VPC.
         if not (int(netmask) >= 16 and int(netmask) <= 28):
-            logger.error('Amazon VPC service requires a CIDR block sizes between a /16 netmask and /28 netmask.')
+            logger.error('Amazon VPC service requires CIDR block sizes between a /16 netmask and /28 netmask.')
             assert False
 
     except AssertionError as error:
