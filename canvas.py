@@ -42,6 +42,9 @@ def main():
                                                          'vpcId': default_vpc.id
                                                      })
 
+    zones = ec2_connection.get_all_zones()
+    zone_names = [zone.name for zone in zones]
+
     archive_name = '.'.join([s3.PROJECT_NAME, 'tar', 'gz'])
     s3.make_tarfile(archive_name, s3.PROJECT_DIRECTORY)
 
@@ -88,13 +91,39 @@ def main():
 
     try:
         logger.info('Uploading server certificate (%s).' % cert_name)
-        iam_connection.upload_server_cert(cert_name, cert_body, private_key, cert_chain)
+        response = iam_connection.upload_server_cert(cert_name, cert_body, private_key, cert_chain)
         logger.info('Uploaded server certificate (%s).' % cert_name)
+        server_certificate_id = response['upload_server_certificate_response']\
+                                        ['upload_server_certificate_result']\
+                                        ['server_certificate_metadata']\
+                                        ['server_certificate_id']
+        cert_arn = response['upload_server_certificate_response']\
+                           ['upload_server_certificate_result']\
+                           ['server_certificate_metadata']\
+                           ['arn']
     except boto.exception.BotoServerError as error:
         if error.status == 400: # Bad Request
             logger.error('Couldn\'t upload server certificate (%s) due to an issue with its contents and/or formatting Error %s: %s.' % (cert_name, error.status, error.reason))
         if error.status == 409: # Conflict
             logger.error('Couldn\'t upload server certificate (%s) due to Error %s: %s.' % (cert_name, error.status, error.reason))
+
+    time.sleep(5) # required 5 second sleep
+
+    logger.info('Connecting to the Amazon EC2 Load Balancing (Amazon ELB) service.')
+    elb_connection = boto.connect_elb()
+    logger.info('Connected to the Amazon EC2 Load Balancing (Amazon ELB) service.')
+
+    elb_name = '-'.join(['elb', core.PROJECT_NAME.lower(), core.args.environment.lower()])
+    logger.info('Creating Elastic Load Balancer (%s).' % elb_name)
+    elb_connection.create_load_balancer(elb_name, # name
+                                        None,     #zones          # Valid only for load balancers in EC2-Classic.
+                                        listeners=[(80,80,'HTTP'),
+                                                   (443,443,'HTTPS',cert_arn)],
+                                        subnets=[subnet.id for subnet in default_subnets],
+                                        security_groups=None,
+                                        scheme='internet-facing', # Valid only for load balancers in EC2-VPC.
+                                        complex_listeners=None)
+    logger.info('Created Elastic Load Balancer (%s).' % elb_name)
 
     policy = """{
         "Version": "2012-10-17",
