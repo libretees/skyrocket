@@ -71,11 +71,30 @@ def main():
     cert_name = '-'.join(['crt', core.PROJECT_NAME.lower(), core.args.environment.lower()])
     with open('public-key.crt', 'r') as cert_file:
         cert_body=cert_file.read()
-    with open('private-key.pem", 'r') as private_key_file:
+    with open('private-key.pem', 'r') as private_key_file:
         private_key=private_key_file.read()
     with open('certificate-chain.pem', 'r') as cert_chain_file:
         cert_chain=cert_chain_file.read()
-    iam_connection.upload_server_cert(cert_name, cert_body, private_key, cert_chain)
+
+    try:
+        logger.info('Deleting server certificate (%s).' % cert_name)
+        iam_connection.delete_server_cert(cert_name)
+        logger.info('Deleted server certificate (%s).' % cert_name)
+    except boto.exception.BotoServerError as error:
+        if error.status == 400: # Bad Request
+            logger.error('Couldn\'t delete server certificate (%s) due to an incompatible filename Error %s: %s.' % (cert_name, error.status, error.reason))
+        if error.status == 404: # Not Found
+            logger.error('Couldn\'t delete server certificate (%s) due to Error %s: %s.' % (cert_name, error.status, error.reason))
+
+    try:
+        logger.info('Uploading server certificate (%s).' % cert_name)
+        iam_connection.upload_server_cert(cert_name, cert_body, private_key, cert_chain)
+        logger.info('Uploaded server certificate (%s).' % cert_name)
+    except boto.exception.BotoServerError as error:
+        if error.status == 400: # Bad Request
+            logger.error('Couldn\'t upload server certificate (%s) due to an issue with its contents and/or formatting Error %s: %s.' % (cert_name, error.status, error.reason))
+        if error.status == 409: # Conflict
+            logger.error('Couldn\'t upload server certificate (%s) due to Error %s: %s.' % (cert_name, error.status, error.reason))
 
     policy = """{
         "Version": "2012-10-17",
