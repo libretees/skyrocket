@@ -3,6 +3,8 @@
 """canvas.py: Provision AWS environments for Django projects."""
 
 import time
+import re
+import sys
 import random
 from string import Template
 import logging
@@ -35,6 +37,41 @@ def main():
     ec2_connection = ec2.connect_ec2()
     rds_connection = rds.connect_rds()
     s3_connection = s3.connect_s3()
+
+    cidr_block = '10.0.0.0/8'
+
+    try:
+        # Split CIDR block into Network IP and Netmask components.
+        cidr_block = cidr_block.split('/')
+        assert len(cidr_block) == 2
+        network_ip = cidr_block[0]
+        netmask = cidr_block[1]
+
+        # Ensure that CIDR block conforms to RFC 1918.
+        assert (re.search(r'^10\.([0-9]|[1-9][0-9]|[1-2][0-5][0-5])\.([0-9]|[1-9][0-9]|[1-2][0-5][0-5])\.([0-9]|[1-9][0-9]|[1-2][0-5][0-5])$', network_ip) or \
+                re.search(r'^172\.(1[6-9]|2[0-9]|3[0-1|)\.([0-9]|[1-9][0-9]|[1-2][0-5][0-5])\.([0-9]|[1-9][0-9]|[1-2][0-5][0-5])$', network_ip) or \
+                re.search(r'^192\.168\.([0-9]|[1-9][0-9]|[1-2][0-5][0-5])\.([0-9]|[1-9][0-9]|[1-2][0-5][0-5])$', network_ip)) and \
+               (re.search(r'(^[1-2]?[0-9]$)|(^3[0-2]$)', cidr_block[1]))
+
+        # Validate netmask.
+        if re.search(r'^10\.([0-9]|[1-9][0-9]|[1-2][0-5][0-5])\.([0-9]|[1-9][0-9]|[1-2][0-5][0-5])\.([0-9]|[1-9][0-9]|[1-2][0-5][0-5])$', network_ip):
+            assert int(netmask) >= 8
+            logger.debug('Valid Class A Private Network CIDR block given (%s).' % '/'.join(cidr_block))
+        elif re.search(r'^172\.(1[6-9]|2[0-9]|3[0-1|)\.([0-9]|[1-9][0-9]|[1-2][0-5][0-5])\.([0-9]|[1-9][0-9]|[1-2][0-5][0-5])$', network_ip):
+            assert int(netmask) >= 12
+            logger.debug('Valid Class B Private Network CIDR block given (%s).' % '/'.join(cidr_block))
+        elif re.search(r'^192\.168\.([0-9]|[1-9][0-9]|[1-2][0-5][0-5])\.([0-9]|[1-9][0-9]|[1-2][0-5][0-5])$', network_ip):
+            assert int(netmask) >= 16
+            logger.debug('Valid Class C Private Network CIDR block given (%s).' % '/'.join(cidr_block))
+
+        # Ensure that netmask is compatible with Amazon VPC.
+        if not (int(netmask) >= 16 and int(netmask) <= 28):
+            logger.error('Amazon VPC service requires a CIDR block sizes between a /16 netmask and /28 netmask.')
+            assert False
+
+    except AssertionError as error:
+        logger.error('Invalid CIDR block given (%s).' % '/'.join(cidr_block))
+        sys.exit(1)
 
     vpcs = vpc_connection.get_all_vpcs()
     default_vpc = vpcs[0]
