@@ -5,6 +5,7 @@
 import time
 import re
 import sys
+import ipaddress
 import random
 from string import Template
 from operator import itemgetter
@@ -39,43 +40,82 @@ def main():
     rds_connection = rds.connect_rds()
     s3_connection = s3.connect_s3()
 
-    cidr_block = '10.0.0.0/24'
+    cidr_block = '172.30.0.0/16'
 
     try:
+        logger.info('Validating CIDR block (%s).' % cidr_block)
+
         # Split CIDR block into Network IP and Netmask components.
         network_ip, netmask = itemgetter(0, 1)(cidr_block.split('/'))
+        netmask = int(netmask)
 
         # Ensure that CIDR block conforms to RFC 1918.
         assert (re.search(r'^10\.([0-9]|[1-9][0-9]|[1-2][0-5][0-5])\.([0-9]|[1-9][0-9]|[1-2][0-5][0-5])\.([0-9]|[1-9][0-9]|[1-2][0-5][0-5])$', network_ip) or \
-                re.search(r'^172\.(1[6-9]|2[0-9]|3[0-1|)\.([0-9]|[1-9][0-9]|[1-2][0-5][0-5])\.([0-9]|[1-9][0-9]|[1-2][0-5][0-5])$', network_ip) or \
+                re.search(r'^172\.(1[6-9]|2[0-9]|3[0-1])\.([0-9]|[1-9][0-9]|[1-2][0-5][0-5])\.([0-9]|[1-9][0-9]|[1-2][0-5][0-5])$', network_ip) or \
                 re.search(r'^192\.168\.([0-9]|[1-9][0-9]|[1-2][0-5][0-5])\.([0-9]|[1-9][0-9]|[1-2][0-5][0-5])$', network_ip)) and \
-               (re.search(r'(^[1-2]?[0-9]$)|(^3[0-2]$)', cidr_block[1]))
+               (re.search(r'(^[1-2]?[0-9]$)|(^3[0-2]$)', str(netmask)))
 
         # Validate netmask.
         if re.search(r'^10\.([0-9]|[1-9][0-9]|[1-2][0-5][0-5])\.([0-9]|[1-9][0-9]|[1-2][0-5][0-5])\.([0-9]|[1-9][0-9]|[1-2][0-5][0-5])$', network_ip):
-            assert int(netmask) >= 8
+            assert netmask >= 8
             logger.debug('Valid Class A Private Network CIDR block given (%s).' % cidr_block)
         elif re.search(r'^172\.(1[6-9]|2[0-9]|3[0-1|)\.([0-9]|[1-9][0-9]|[1-2][0-5][0-5])\.([0-9]|[1-9][0-9]|[1-2][0-5][0-5])$', network_ip):
-            assert int(netmask) >= 12
+            assert netmask >= 12
             logger.debug('Valid Class B Private Network CIDR block given (%s).' % cidr_block)
         elif re.search(r'^192\.168\.([0-9]|[1-9][0-9]|[1-2][0-5][0-5])\.([0-9]|[1-9][0-9]|[1-2][0-5][0-5])$', network_ip):
-            assert int(netmask) >= 16
+            assert netmask >= 16
             logger.debug('Valid Class C Private Network CIDR block given (%s).' % cidr_block)
 
         # Ensure that netmask is compatible with Amazon VPC.
-        if not (int(netmask) >= 16 and int(netmask) <= 28):
+        if not (netmask >= 16 and netmask <= 28):
             logger.error('Amazon VPC service requires CIDR block sizes between a /16 netmask and /28 netmask.')
             assert False
 
+        logger.info('CIDR block validated (%s).' % cidr_block)
     except AssertionError as error:
         logger.error('Invalid CIDR block given (%s).' % cidr_block)
         sys.exit(1)
 
     vpc_name = '-'.join(['vpc', core.PROJECT_NAME.lower(), core.args.environment.lower()])
+    logger.info('Creating Virtual Private Cloud (VPC) (%s) with CIDR block (%s).' % (vpc_name, cidr_block))
     new_vpc = vpc_connection.create_vpc(cidr_block,                 # cidr_block
                                         instance_tenancy='default',
                                         dry_run=False)
     new_vpc.add_tag('Name', vpc_name)
+    logger.info('Created Virtual Private Cloud (VPC) (%s).' % vpc_name)
+
+    acl_name = '-'.join(['acl', core.PROJECT_NAME.lower(), core.args.environment.lower()])
+    acl = vpc_connection.get_all_network_acls(filters={'vpc_id': new_vpc.id})[0]
+    acl.add_tag('Name', acl_name)
+
+    network_ip = int(ipaddress.IPv4Address(network_ip))
+
+    zones = ec2_connection.get_all_zones()
+    subnet_netmask = netmask+len(bin(len(zones)))-2
+
+    if subnet_netmask > 28:
+        logger.warning('The CIDR block specified will not support the creation of subnets in all availability zones.' % cidr_block)
+
+    for i, zone in enumerate(zones):
+        subnet_name = '-'.join(['subnet', core.PROJECT_NAME.lower(), core.args.environment.lower(), zone.name])
+
+        subnet_network_ip = (network_ip | (i << 32-subnet_netmask))
+        subnet_cidr_block = str(subnet_network_ip >> 24) + '.' + \
+                            str((subnet_network_ip >> 16) & 255) + '.' + \
+                            str((subnet_network_ip >> 8) & 255) + '.' + \
+                            str(subnet_network_ip & 255) + '/' + \
+                            str(subnet_netmask)
+        logger.info('Creating subnet (%s).' % subnet_name)
+        subnet = vpc_connection.create_subnet(new_vpc.id,                  # vpc_id
+                                              subnet_cidr_block,           # cidr_block
+                                              availability_zone=zone.name,
+                                              dry_run=False)
+        subnet.add_tag('Name', subnet_name)
+        available_ips = (0xffffffff ^ int(0xffffffff << 32-subnet_netmask & 0xffffffff))-4 # 4 addresses are reserved by Amazon for IP networking purposes.
+                                                                                           # .0 for the network, .1 for the gateway,
+                                                                                           # .3 for DHCP services, and .255 for broadcast.
+        logger.info('Created subnet (%s) with %d IPs available.' % (subnet_name, available_ips))
+
     sys.exit(0)
 
     vpcs = vpc_connection.get_all_vpcs()
@@ -84,8 +124,7 @@ def main():
                                                          'vpcId': default_vpc.id
                                                      })
 
-    zones = ec2_connection.get_all_zones()
-    zone_names = [zone.name for zone in zones]
+
 
     archive_name = '.'.join([s3.PROJECT_NAME, 'tar', 'gz'])
     s3.make_tarfile(archive_name, s3.PROJECT_DIRECTORY)
