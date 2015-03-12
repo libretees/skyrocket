@@ -72,10 +72,9 @@ def main():
         sys.exit(1)
 
     vpc_name = '-'.join(['vpc', core.PROJECT_NAME.lower(), core.args.environment.lower()])
-    vpc_connection.create_vpc(cidr_block,                 # cidr_block
-                              instance_tenancy='default',
-                              dry_run=False)
-    new_vpc = vpc_connection.get_all_vpcs(filters=[("cidrBlock", cidr_block)])[-1]
+    new_vpc = vpc_connection.create_vpc(cidr_block,                 # cidr_block
+                                        instance_tenancy='default',
+                                        dry_run=False)
     new_vpc.add_tag('Name', vpc_name)
     sys.exit(0)
 
