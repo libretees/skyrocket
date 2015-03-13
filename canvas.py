@@ -69,18 +69,7 @@ def validate_cidr_block(cidr_block):
         logger.error('Invalid CIDR block given (%s).' % cidr_block)
         return False
 
-def main():
-
-    vpc_connection = vpc.connect_vpc()
-    ec2_connection = ec2.connect_ec2()
-    rds_connection = rds.connect_rds()
-    s3_connection = s3.connect_s3()
-
-    cidr_block = '10.0.0.0/16'
-
-    if not validate_cidr_block(cidr_block):
-        sys.exit(1)
-
+def create_public_vpc(vpc_connection, cidr_block):
     vpc_name = '-'.join(['vpc', core.PROJECT_NAME.lower(), core.args.environment.lower()])
     logger.info('Creating Virtual Private Cloud (VPC) (%s) with CIDR block (%s).' % (vpc_name, cidr_block))
     new_vpc = vpc_connection.create_vpc(cidr_block,                 # cidr_block
@@ -115,7 +104,10 @@ def main():
                                 interface_id=None,
                                 vpc_peering_connection_id=None,
                                 dry_run=False)
+    return new_vpc
 
+def create_subnets(ec2_connection, vpc_connection, vpc, cidr_block):
+    network_ip, netmask = itemgetter(0, 1)(cidr_block.split('/'))
     network_ip = int(ipaddress.IPv4Address(network_ip))
 
     zones = ec2_connection.get_all_zones()
@@ -139,7 +131,7 @@ def main():
                                                                                         # .0 for the network, .1 for the gateway,
                                                                                         # .3 for DHCP services, and .255 for broadcast.
         logger.info('Creating subnet (%s) with %d available IP addresses.' % (subnet_name, available_ips))
-        subnet = vpc_connection.create_subnet(new_vpc.id,                  # vpc_id
+        subnet = vpc_connection.create_subnet(vpc.id,                      # vpc_id
                                               subnet_cidr_block,           # cidr_block
                                               availability_zone=zone.name,
                                               dry_run=False)
@@ -147,6 +139,23 @@ def main():
         subnet.add_tag('Name', subnet_name)
         subnets.append(subnet)
         logger.info('Created subnet (%s).' % subnet_name)
+
+    return subnets
+
+def main():
+
+    vpc_connection = vpc.connect_vpc()
+    ec2_connection = ec2.connect_ec2()
+    rds_connection = rds.connect_rds()
+    s3_connection = s3.connect_s3()
+
+    cidr_block = '10.0.0.0/16'
+
+    if not validate_cidr_block(cidr_block):
+        sys.exit(1)
+
+    public_vpc = create_public_vpc(vpc_connection, cidr_block)
+    subnets = create_subnets(ec2_connection, vpc_connection, public_vpc, cidr_block)
 
     archive_name = '.'.join([s3.PROJECT_NAME, 'tar', 'gz'])
     logger.info('Creating deployment archive (%s).' % archive_name)
