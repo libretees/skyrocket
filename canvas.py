@@ -33,15 +33,7 @@ def get_script(region, s3bucket, s3object, s3object2, filename='user-data.sh'):
         s3object2=s3object2
     )
 
-def main():
-
-    vpc_connection = vpc.connect_vpc()
-    ec2_connection = ec2.connect_ec2()
-    rds_connection = rds.connect_rds()
-    s3_connection = s3.connect_s3()
-
-    cidr_block = '10.0.0.0/16'
-
+def validate_cidr_block(cidr_block):
     try:
         logger.info('Validating CIDR block (%s).' % cidr_block)
 
@@ -72,8 +64,21 @@ def main():
             assert False
 
         logger.info('CIDR block validated (%s).' % cidr_block)
+        return True
     except AssertionError as error:
         logger.error('Invalid CIDR block given (%s).' % cidr_block)
+        return False
+
+def main():
+
+    vpc_connection = vpc.connect_vpc()
+    ec2_connection = ec2.connect_ec2()
+    rds_connection = rds.connect_rds()
+    s3_connection = s3.connect_s3()
+
+    cidr_block = '10.0.0.0/16'
+
+    if not validate_cidr_block(cidr_block):
         sys.exit(1)
 
     vpc_name = '-'.join(['vpc', core.PROJECT_NAME.lower(), core.args.environment.lower()])
@@ -81,8 +86,8 @@ def main():
     new_vpc = vpc_connection.create_vpc(cidr_block,                 # cidr_block
                                         instance_tenancy='default',
                                         dry_run=False)
-    new_vpc.add_tag('Name', vpc_name)
     logger.info('Created Virtual Private Cloud (VPC) (%s).' % vpc_name)
+    new_vpc.add_tag('Name', vpc_name)
 
     igw_name = '-'.join(['igw', core.PROJECT_NAME.lower(), core.args.environment.lower()])
     logger.info('Creating Internet Gateway (%s).' % igw_name)
