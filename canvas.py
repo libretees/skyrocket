@@ -40,7 +40,7 @@ def main():
     rds_connection = rds.connect_rds()
     s3_connection = s3.connect_s3()
 
-    cidr_block = '172.30.0.0/16'
+    cidr_block = '10.0.0.0/16'
 
     try:
         logger.info('Validating CIDR block (%s).' % cidr_block)
@@ -84,9 +84,32 @@ def main():
     new_vpc.add_tag('Name', vpc_name)
     logger.info('Created Virtual Private Cloud (VPC) (%s).' % vpc_name)
 
+    igw_name = '-'.join(['igw', core.PROJECT_NAME.lower(), core.args.environment.lower()])
+    logger.info('Creating Internet Gateway (%s).' % igw_name)
+    igw = vpc_connection.create_internet_gateway(dry_run=False)
+    logger.info('Created Internet Gateway (%s).' % igw_name)
+    igw.add_tag('Name', igw_name)
+
+    logger.info('Attaching Internet Gateway (%s) to VPC (%s).' % (igw_name, vpc_name))
+    vpc_connection.attach_internet_gateway(igw.id,     # internet_gateway_id
+                                           new_vpc.id, # vpc_id
+                                           dry_run=False)
+    logger.info('Attached Internet Gateway (%s).' % igw_name)
+
     acl_name = '-'.join(['acl', core.PROJECT_NAME.lower(), core.args.environment.lower()])
     acl = vpc_connection.get_all_network_acls(filters={'vpc_id': new_vpc.id})[0]
     acl.add_tag('Name', acl_name)
+
+    rtb_name = '-'.join(['rtb', core.PROJECT_NAME.lower(), core.args.environment.lower()])
+    rtb = vpc_connection.get_all_route_tables(filters={'vpc_id': new_vpc.id})[0]
+    rtb.add_tag('Name', rtb_name)
+    vpc_connection.create_route(rtb.id,         # route_table_id
+                                '0.0.0.0/0',    # destination_cidr_block
+                                gateway_id=igw.id,
+                                instance_id=None,
+                                interface_id=None,
+                                vpc_peering_connection_id=None,
+                                dry_run=False)
 
     network_ip = int(ipaddress.IPv4Address(network_ip))
 
@@ -96,6 +119,7 @@ def main():
     if subnet_netmask > 28:
         logger.warning('The CIDR block specified will not support the creation of subnets in all availability zones.' % cidr_block)
 
+    subnets = list()
     for i, zone in enumerate(zones):
         subnet_name = '-'.join(['subnet', core.PROJECT_NAME.lower(), core.args.environment.lower(), zone.name])
 
@@ -105,29 +129,24 @@ def main():
                             str((subnet_network_ip >> 8) & 255) + '.' + \
                             str(subnet_network_ip & 255) + '/' + \
                             str(subnet_netmask)
-        logger.info('Creating subnet (%s).' % subnet_name)
+        available_ips = (0xffffffff ^ (0xffffffff << 32-subnet_netmask & 0xffffffff))-4 # 4 addresses are reserved by Amazon
+                                                                                        # for IP networking purposes.
+                                                                                        # .0 for the network, .1 for the gateway,
+                                                                                        # .3 for DHCP services, and .255 for broadcast.
+        logger.info('Creating subnet (%s) with %d available IP addresses.' % (subnet_name, available_ips))
         subnet = vpc_connection.create_subnet(new_vpc.id,                  # vpc_id
                                               subnet_cidr_block,           # cidr_block
                                               availability_zone=zone.name,
                                               dry_run=False)
+        time.sleep(1) # required 1 second sleep
         subnet.add_tag('Name', subnet_name)
-        available_ips = (0xffffffff ^ int(0xffffffff << 32-subnet_netmask & 0xffffffff))-4 # 4 addresses are reserved by Amazon for IP networking purposes.
-                                                                                           # .0 for the network, .1 for the gateway,
-                                                                                           # .3 for DHCP services, and .255 for broadcast.
-        logger.info('Created subnet (%s) with %d IPs available.' % (subnet_name, available_ips))
-
-    sys.exit(0)
-
-    vpcs = vpc_connection.get_all_vpcs()
-    default_vpc = vpcs[0]
-    default_subnets = vpc_connection.get_all_subnets(filters={
-                                                         'vpcId': default_vpc.id
-                                                     })
-
-
+        subnets.append(subnet)
+        logger.info('Created subnet (%s).' % subnet_name)
 
     archive_name = '.'.join([s3.PROJECT_NAME, 'tar', 'gz'])
+    logger.info('Creating deployment archive (%s).' % archive_name)
     s3.make_tarfile(archive_name, s3.PROJECT_DIRECTORY)
+    logger.info('Created deployment archive (%s).' % archive_name)
 
     bootstrap_archive_name = '.'.join(['configure', s3.PROJECT_NAME, 'tar', 'gz'])
     s3.make_tarfile(bootstrap_archive_name, 'deploy')
@@ -194,14 +213,27 @@ def main():
     elb_connection = boto.connect_elb()
     logger.info('Connected to the Amazon EC2 Load Balancing (Amazon ELB) service.')
 
+    sg_name = '-'.join(['gp', core.PROJECT_NAME.lower(), core.args.environment.lower()])
+    logger.info('Creating security group (%s).' % sg_name)
+    sg = ec2_connection.create_security_group(sg_name, 'Security Group Description', vpc_id=new_vpc.id)
+    logger.info('Created security group (%s).' % sg_name)
+
+    sg.authorize('tcp', from_port=80, to_port=80, cidr_ip='0.0.0.0/0')
+    sg.authorize('tcp', from_port=443, to_port=443, cidr_ip='0.0.0.0/0')
+    ec2_connection.revoke_security_group_egress(sg.id, -1, from_port=0, to_port=65535, cidr_ip='0.0.0.0/0')
+    ec2_connection.authorize_security_group_egress(sg.id, 'tcp', from_port=53, to_port=53, cidr_ip='0.0.0.0/0')
+    ec2_connection.authorize_security_group_egress(sg.id, 'udp', from_port=53, to_port=53, cidr_ip='0.0.0.0/0')
+    ec2_connection.authorize_security_group_egress(sg.id, 'tcp', from_port=80, to_port=80, cidr_ip='0.0.0.0/0')
+    ec2_connection.authorize_security_group_egress(sg.id, 'tcp', from_port=443, to_port=443, cidr_ip='0.0.0.0/0')
+
     elb_name = '-'.join(['elb', core.PROJECT_NAME.lower(), core.args.environment.lower()])
     logger.info('Creating Elastic Load Balancer (%s).' % elb_name)
     elb_connection.create_load_balancer(elb_name, # name
-                                        None,     #zones          # Valid only for load balancers in EC2-Classic.
+                                        None,     # zones         - Valid only for load balancers in EC2-Classic.
                                         listeners=[(80,80,'HTTP'),
                                                    (443,443,'HTTPS',cert_arn)],
-                                        subnets=[subnet.id for subnet in default_subnets],
-                                        security_groups=None,
+                                        subnets=[subnet.id for subnet in subnets],
+                                        security_groups=[sg.id],
                                         scheme='internet-facing', # Valid only for load balancers in EC2-VPC.
                                         complex_listeners=None)
     logger.info('Created Elastic Load Balancer (%s).' % elb_name)
@@ -232,32 +264,33 @@ def main():
     logger.info('Created instance profile (%s).' % 'myinstanceprofile')
     time.sleep(5) # required 5 second sleep
 
-    sg_name = '-'.join(['gp', core.PROJECT_NAME.lower(), core.args.environment.lower()])
-    logger.info('Creating security group (%s).' % sg_name)
-    sg = ec2_connection.create_security_group(sg_name, 'Security Group Description', vpc_id=default_vpc.id)
-    logger.info('Created security group (%s).' % sg_name)
+    instances = list()
+    for subnet in subnets:
+        logger.info('Creating Elastic Network Interface (ENI).')
+        interface = boto.ec2.networkinterface.NetworkInterfaceSpecification(subnet_id=subnet.id,
+                                                                            groups=[sg.id],
+                                                                            associate_public_ip_address=True)
+        logger.info('Created Elastic Network Interface (ENI).')
+        interfaces = boto.ec2.networkinterface.NetworkInterfaceCollection(interface)
 
-    sg.authorize('tcp', from_port=80, to_port=80, cidr_ip='0.0.0.0/0')
-    sg.authorize('tcp', from_port=443, to_port=443, cidr_ip='0.0.0.0/0')
-    ec2_connection.revoke_security_group_egress(sg.id, -1, from_port=0, to_port=65535, cidr_ip='0.0.0.0/0')
-    ec2_connection.authorize_security_group_egress(sg.id, 'tcp', from_port=53, to_port=53, cidr_ip='0.0.0.0/0')
-    ec2_connection.authorize_security_group_egress(sg.id, 'udp', from_port=53, to_port=53, cidr_ip='0.0.0.0/0')
-    ec2_connection.authorize_security_group_egress(sg.id, 'tcp', from_port=80, to_port=80, cidr_ip='0.0.0.0/0')
-    ec2_connection.authorize_security_group_egress(sg.id, 'tcp', from_port=443, to_port=443, cidr_ip='0.0.0.0/0')
+        ec2_instance_name = '-'.join(['ec2', core.PROJECT_NAME.lower(), core.args.environment.lower(), '%x' % random.randrange(2**32)])
+        logger.info('Creating EC2 Instance (%s) in %s.' % (ec2_instance_name, subnet.availability_zone))
+        reservation = ec2_connection.run_instances('ami-9a562df2',
+                                                   instance_type='t2.micro',
+                                                   #security_group_ids=[sg.id], - Not required when an ENI is specified.
+                                                   #subnet_id=subnet.id,        - Not required when an ENI is specified.
+                                                   instance_profile_name='myinstanceprofile',
+                                                   network_interfaces=interfaces,
+                                                   user_data=get_script('us-east-1', s3_bucket_name, archive_name, bootstrap_archive_name))
+        instance = reservation.instances[-1]
+        instances.append(instance)
+        time.sleep(1) # required 1 second sleep
+        ec2_connection.create_tags([instance.id], {"Name": ec2_instance_name})
+        logger.info('Created EC2 Instance (%s).' % ec2_instance_name)
 
-    ec2_instance_name = '-'.join(['ec2', core.PROJECT_NAME.lower(), core.args.environment.lower(), '%x' % random.randrange(2**32)])
-    logger.info('Creating EC2 Instance (%s).' % ec2_instance_name)
-    reservation = ec2_connection.run_instances('ami-9a562df2',
-                                               instance_type='t2.micro',
-                                               security_group_ids = [sg.id],
-                                               subnet_id=default_subnets[0].id,
-                                               instance_profile_name='myinstanceprofile',
-                                               #key_name='kp-com-libretees-dev',
-                                               user_data=get_script('us-east-1', s3_bucket_name, archive_name, bootstrap_archive_name))
-
-    instance = reservation.instances[-1]
-    ec2_connection.create_tags([instance.id], {"Name": ec2_instance_name})
-    logger.info('Created EC2 Instance (%s).' % ec2_instance_name)
+    logger.info('Registering EC2 Instances with Elastic Load Balancer (%s).' % elb_name)
+    elb_connection.register_instances(elb_name, [instance.id for instance in instances])
+    logger.info('Registered EC2 Instances with Elastic Load Balancer (%s).' % elb_name)
 
     # curl http://169.254.169.254/latest/meta-data/iam/security-credentials/myrole
     # aws s3 cp --region us-east-1 s3://s3-gossamer-staging-faddde2b/gossamer.tar.gz gossamer.tar.gz
