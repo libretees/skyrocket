@@ -242,6 +242,16 @@ def main():
     ec2_connection.authorize_security_group_egress(sg.id, 'tcp', from_port=443, to_port=443, cidr_ip='0.0.0.0/0')
 
     elb_name = '-'.join(['elb', core.PROJECT_NAME.lower(), core.args.environment.lower()])
+    logger.info('Deleting Elastic Load Balancer (%s).' % elb_name)
+    try:
+        elb_connection.delete_load_balancer(elb_name)
+    except boto.exception.BotoServerError as error:
+        if error.status == 400: # Bad Request
+            logger.error('Couldn\'t delete Elastic Load Balancer (%s) due to a malformed request %s: %s.' % (elb_name, error.status, error.reason))
+        if error.status == 404: # Not Found
+            logger.error('Elastic Load Balancer (%s) was not found. Error %s: %s.' % (elb_name, error.status, error.reason))
+    logger.info('Deleted Elastic Load Balancer (%s).' % elb_name)
+
     logger.info('Creating Elastic Load Balancer (%s).' % elb_name)
     elb_connection.create_load_balancer(elb_name, # name
                                         None,     # zones         - Valid only for load balancers in EC2-Classic.
@@ -278,9 +288,9 @@ def main():
         iam_connection.delete_role(role_name)
     except boto.exception.BotoServerError as error:
         if error.status == 400: # Bad Request
-            logger.error('Couldn\'t create instance profile (%s) due to a malformed request %s: %s.' % ('myinstanceprofile', error.status, error.reason))
+            logger.error('Couldn\'t delete instance profile (%s) due to a malformed request %s: %s.' % (instance_profile_name, error.status, error.reason))
         if error.status == 404: # Not Found
-            logger.error('Instance profile (%s) was not found. Error %s: %s.' % ('myinstanceprofile', error.status, error.reason))
+            logger.error('Instance profile (%s) was not found. Error %s: %s.' % (instance_profile_name, error.status, error.reason))
     logger.info('Deleted instance profile (%s).' % instance_profile_name)
 
     logger.info('Creating instance profile (%s).' % instance_profile_name)
