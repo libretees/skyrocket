@@ -35,7 +35,7 @@ def get_script(region, s3bucket, s3object, s3object2, filename='user-data.sh'):
 
 def validate_cidr_block(cidr_block):
     try:
-        logger.info('Validating CIDR block (%s).' % cidr_block)
+        logger.debug('Validating CIDR block (%s).' % cidr_block)
 
         # Split CIDR block into Network IP and Netmask components.
         network_ip, netmask = itemgetter(0, 1)(cidr_block.split('/'))
@@ -63,7 +63,7 @@ def validate_cidr_block(cidr_block):
             logger.error('Amazon VPC service requires CIDR block sizes between a /16 netmask and /28 netmask.')
             assert False
 
-        logger.info('CIDR block validated (%s).' % cidr_block)
+        logger.debug('CIDR block validated (%s).' % cidr_block)
         return True
     except AssertionError as error:
         logger.error('Invalid CIDR block given (%s).' % cidr_block)
@@ -71,39 +71,45 @@ def validate_cidr_block(cidr_block):
 
 def create_public_vpc(vpc_connection, cidr_block):
     vpc_name = '-'.join(['vpc', core.PROJECT_NAME.lower(), core.args.environment.lower()])
-    logger.info('Creating Virtual Private Cloud (VPC) (%s) with CIDR block (%s).' % (vpc_name, cidr_block))
-    new_vpc = vpc_connection.create_vpc(cidr_block,                 # cidr_block
-                                        instance_tenancy='default',
-                                        dry_run=False)
-    logger.info('Created Virtual Private Cloud (VPC) (%s).' % vpc_name)
-    new_vpc.add_tag('Name', vpc_name)
+    new_vpc = None
+    try:
+        logger.info('Creating Virtual Private Cloud (VPC) (%s) with CIDR block (%s).' % (vpc_name, cidr_block))
+        new_vpc = vpc_connection.create_vpc(cidr_block,                 # cidr_block
+                                            instance_tenancy='default',
+                                            dry_run=False)
+        logger.info('Created Virtual Private Cloud (VPC) (%s).' % vpc_name)
+        new_vpc.add_tag('Name', vpc_name)
+    except boto.exception.EC2ResponseError as error:
+        if error.status == 400: # Bad Request
+            logger.error('Could not create VPC (%s). Error %s: %s.' % (vpc_name, error.status, error.reason))
 
-    igw_name = '-'.join(['igw', core.PROJECT_NAME.lower(), core.args.environment.lower()])
-    logger.info('Creating Internet Gateway (%s).' % igw_name)
-    igw = vpc_connection.create_internet_gateway(dry_run=False)
-    logger.info('Created Internet Gateway (%s).' % igw_name)
-    igw.add_tag('Name', igw_name)
+    if new_vpc:
+        igw_name = '-'.join(['igw', core.PROJECT_NAME.lower(), core.args.environment.lower()])
+        logger.info('Creating Internet Gateway (%s).' % igw_name)
+        igw = vpc_connection.create_internet_gateway(dry_run=False)
+        logger.info('Created Internet Gateway (%s).' % igw_name)
+        igw.add_tag('Name', igw_name)
 
-    logger.info('Attaching Internet Gateway (%s) to VPC (%s).' % (igw_name, vpc_name))
-    vpc_connection.attach_internet_gateway(igw.id,     # internet_gateway_id
-                                           new_vpc.id, # vpc_id
-                                           dry_run=False)
-    logger.info('Attached Internet Gateway (%s).' % igw_name)
+        logger.info('Attaching Internet Gateway (%s) to VPC (%s).' % (igw_name, vpc_name))
+        vpc_connection.attach_internet_gateway(igw.id,     # internet_gateway_id
+                                               new_vpc.id, # vpc_id
+                                               dry_run=False)
+        logger.info('Attached Internet Gateway (%s).' % igw_name)
 
-    acl_name = '-'.join(['acl', core.PROJECT_NAME.lower(), core.args.environment.lower()])
-    acl = vpc_connection.get_all_network_acls(filters={'vpc_id': new_vpc.id})[0]
-    acl.add_tag('Name', acl_name)
+        acl_name = '-'.join(['acl', core.PROJECT_NAME.lower(), core.args.environment.lower()])
+        acl = vpc_connection.get_all_network_acls(filters={'vpc_id': new_vpc.id})[0]
+        acl.add_tag('Name', acl_name)
 
-    rtb_name = '-'.join(['rtb', core.PROJECT_NAME.lower(), core.args.environment.lower()])
-    rtb = vpc_connection.get_all_route_tables(filters={'vpc_id': new_vpc.id})[0]
-    rtb.add_tag('Name', rtb_name)
-    vpc_connection.create_route(rtb.id,         # route_table_id
-                                '0.0.0.0/0',    # destination_cidr_block
-                                gateway_id=igw.id,
-                                instance_id=None,
-                                interface_id=None,
-                                vpc_peering_connection_id=None,
-                                dry_run=False)
+        rtb_name = '-'.join(['rtb', core.PROJECT_NAME.lower(), core.args.environment.lower()])
+        rtb = vpc_connection.get_all_route_tables(filters={'vpc_id': new_vpc.id})[0]
+        rtb.add_tag('Name', rtb_name)
+        vpc_connection.create_route(rtb.id,         # route_table_id
+                                    '0.0.0.0/0',    # destination_cidr_block
+                                    gateway_id=igw.id,
+                                    instance_id=None,
+                                    interface_id=None,
+                                    vpc_peering_connection_id=None,
+                                    dry_run=False)
     return new_vpc
 
 def create_subnets(ec2_connection, vpc_connection, vpc, cidr_block):
@@ -131,11 +137,16 @@ def create_subnets(ec2_connection, vpc_connection, vpc, cidr_block):
                                                                                         # for IP networking purposes.
                                                                                         # .0 for the network, .1 for the gateway,
                                                                                         # .3 for DHCP services, and .255 for broadcast.
-        logger.info('Creating subnet (%s) with %d available IP addresses.' % (subnet_name, available_ips))
-        subnet = vpc_connection.create_subnet(vpc.id,                      # vpc_id
-                                              subnet_cidr_block,           # cidr_block
-                                              availability_zone=zone.name,
-                                              dry_run=False)
+        try:
+            logger.info('Creating subnet (%s) with %d available IP addresses.' % (subnet_name, available_ips))
+            subnet = vpc_connection.create_subnet(vpc.id,                      # vpc_id
+                                                  subnet_cidr_block,           # cidr_block
+                                                  availability_zone=zone.name,
+                                                  dry_run=False)
+        except boto.exception.BotoServerError as error:
+            if error.status == 400: # Bad Request
+                logger.error('Error %s: %s. Couldn\'t create subnet (%s).' % (error.status, error.reason, subnet_name))
+
         time.sleep(1) # required 1 second sleep
         subnet.add_tag('Name', subnet_name)
         subnets.append(subnet)
@@ -182,7 +193,7 @@ def main():
             key = bucket.new_key(bootstrap_archive_name)
             key.set_contents_from_filename(bootstrap_archive_name, policy='private')
         except boto.exception.S3CreateError as error:
-            logger.error('Couldn\'t create S3 bucket (%s) due to Error %s: %s.' % (s3_bucket_name, error.status, error.reason))
+            logger.error('Could not create S3 bucket (%s) due to Error %s: %s.' % (s3_bucket_name, error.status, error.reason))
 
     iam_connection = iam.connect_iam()
 
@@ -317,7 +328,7 @@ def main():
                                                    instance_type='t2.micro',
                                                    #security_group_ids=[sg.id], - Not required when an ENI is specified.
                                                    #subnet_id=subnet.id,        - Not required when an ENI is specified.
-                                                   instance_profile_name='myinstanceprofile',
+                                                   instance_profile_name=instance_profile_name,
                                                    network_interfaces=interfaces,
                                                    user_data=get_script('us-east-1', s3_bucket_name, archive_name, bootstrap_archive_name))
         instance = reservation.instances[-1]
