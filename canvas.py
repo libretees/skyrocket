@@ -109,6 +109,7 @@ def create_public_vpc(vpc_connection, cidr_block):
 def create_subnets(ec2_connection, vpc_connection, vpc, cidr_block):
     network_ip, netmask = itemgetter(0, 1)(cidr_block.split('/'))
     network_ip = int(ipaddress.IPv4Address(network_ip))
+    netmask = int(netmask)
 
     zones = ec2_connection.get_all_zones()
     subnet_netmask = netmask+len(bin(len(zones)))-2
@@ -229,7 +230,7 @@ def main():
 
     sg_name = '-'.join(['gp', core.PROJECT_NAME.lower(), core.args.environment.lower()])
     logger.info('Creating security group (%s).' % sg_name)
-    sg = ec2_connection.create_security_group(sg_name, 'Security Group Description', vpc_id=new_vpc.id)
+    sg = ec2_connection.create_security_group(sg_name, 'Security Group Description', vpc_id=public_vpc.id)
     logger.info('Created security group (%s).' % sg_name)
 
     sg.authorize('tcp', from_port=80, to_port=80, cidr_ip='0.0.0.0/0')
@@ -264,18 +265,31 @@ def main():
         }]
     }""" % (s3_bucket_name, archive_name, s3_bucket_name, bootstrap_archive_name)
 
-    logger.info('Creating instance profile (%s).' % 'myinstanceprofile')
 
-    iam_connection.remove_role_from_instance_profile('myinstanceprofile', 'myrole')
-    iam_connection.delete_instance_profile('myinstanceprofile')
-    iam_connection.delete_role_policy('myrole', 'mypolicy')
-    iam_connection.delete_role('myrole')
-    instance_profile = iam_connection.create_instance_profile('myinstanceprofile')
-    role = iam_connection.create_role('myrole')
-    iam_connection.add_role_to_instance_profile('myinstanceprofile', 'myrole')
-    iam_connection.put_role_policy('myrole', 'mypolicy', policy)
+    instance_profile_name = '-'.join(['profile', core.PROJECT_NAME.lower(), core.args.environment.lower()])
+    policy_name = '-'.join(['policy', core.PROJECT_NAME.lower(), core.args.environment.lower()])
+    role_name = '-'.join(['role', core.PROJECT_NAME.lower(), core.args.environment.lower()])
 
-    logger.info('Created instance profile (%s).' % 'myinstanceprofile')
+    logger.info('Deleting instance profile (%s).' % instance_profile_name)
+    try:
+        iam_connection.remove_role_from_instance_profile(instance_profile_name, role_name)
+        iam_connection.delete_instance_profile(instance_profile_name)
+        iam_connection.delete_role_policy(role_name, policy_name)
+        iam_connection.delete_role(role_name)
+    except boto.exception.BotoServerError as error:
+        if error.status == 400: # Bad Request
+            logger.error('Couldn\'t create instance profile (%s) due to a malformed request %s: %s.' % ('myinstanceprofile', error.status, error.reason))
+        if error.status == 404: # Not Found
+            logger.error('Instance profile (%s) was not found. Error %s: %s.' % ('myinstanceprofile', error.status, error.reason))
+    logger.info('Deleted instance profile (%s).' % instance_profile_name)
+
+    logger.info('Creating instance profile (%s).' % instance_profile_name)
+    instance_profile = iam_connection.create_instance_profile(instance_profile_name)
+    role = iam_connection.create_role(role_name)
+    iam_connection.add_role_to_instance_profile(instance_profile_name, role_name)
+    iam_connection.put_role_policy(role_name, policy_name, policy)
+    logger.info('Created instance profile (%s).' % instance_profile_name)
+
     time.sleep(5) # required 5 second sleep
 
     instances = list()
