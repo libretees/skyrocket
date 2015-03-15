@@ -88,6 +88,7 @@ def create_public_vpc(vpc_connection, cidr_block):
         logger.info('Creating Internet Gateway (%s).' % igw_name)
         igw = vpc_connection.create_internet_gateway(dry_run=False)
         logger.info('Created Internet Gateway (%s).' % igw_name)
+        time.sleep(1) # required 1-second sleep
         igw.add_tag('Name', igw_name)
 
         logger.info('Attaching Internet Gateway (%s) to VPC (%s).' % (igw_name, vpc_name))
@@ -147,7 +148,7 @@ def create_subnets(ec2_connection, vpc_connection, vpc, cidr_block):
             if error.status == 400: # Bad Request
                 logger.error('Error %s: %s. Couldn\'t create subnet (%s).' % (error.status, error.reason, subnet_name))
 
-        time.sleep(1) # required 1 second sleep
+        time.sleep(1) # required 1-second sleep
         subnet.add_tag('Name', subnet_name)
         subnets.append(subnet)
         logger.info('Created subnet (%s).' % subnet_name)
@@ -226,7 +227,7 @@ def upload_ssl_certificate():
                            ['upload_server_certificate_result']\
                            ['server_certificate_metadata']\
                            ['arn']
-        time.sleep(5) # required 5 second sleep
+        time.sleep(5) # required 5-second sleep
     except boto.exception.BotoServerError as error:
         if error.status == 400: # Bad Request
             logger.error('Couldn\'t upload server certificate (%s) due to an issue with its contents and/or formatting Error %s: %s.' % (cert_name, error.status, error.reason))
@@ -288,13 +289,14 @@ def create_instance_profile(policy):
     iam_connection.add_role_to_instance_profile(instance_profile_name, role_name)
     iam_connection.put_role_policy(role_name, policy_name, policy)
     logger.info('Created Instance Profile (%s).' % instance_profile_name)
-    time.sleep(5) # required 5 second sleep
+    time.sleep(5) # required 5-second sleep
     return instance_profile_name
 
-def create_security_group():
+def create_security_group(vpc):
+    ec2_connection = ec2.connect_ec2()
     sg_name = '-'.join(['gp', core.PROJECT_NAME.lower(), core.args.environment.lower()])
     logger.info('Creating security group (%s).' % sg_name)
-    sg = ec2_connection.create_security_group(sg_name, 'Security Group Description', vpc_id=public_vpc.id)
+    sg = ec2_connection.create_security_group(sg_name, 'Security Group Description', vpc_id=vpc.id)
     logger.info('Created security group (%s).' % sg_name)
 
     sg.authorize('tcp', from_port=80, to_port=80, cidr_ip='0.0.0.0/0')
@@ -306,11 +308,40 @@ def create_security_group():
     ec2_connection.authorize_security_group_egress(sg.id, 'tcp', from_port=443, to_port=443, cidr_ip='0.0.0.0/0')
     return sg
 
+def create_elb(sg, subnets, cert_arn):
+    logger.info('Connecting to the Amazon EC2 Load Balancing (Amazon ELB) service.')
+    elb_connection = boto.connect_elb()
+    logger.info('Connected to the Amazon EC2 Load Balancing (Amazon ELB) service.')
+
+    elb_name = '-'.join(['elb', core.PROJECT_NAME.lower(), core.args.environment.lower()])
+    logger.info('Deleting Elastic Load Balancer (%s).' % elb_name)
+    try:
+        elb_connection.delete_load_balancer(elb_name)
+    except boto.exception.BotoServerError as error:
+        if error.status == 400: # Bad Request
+            logger.error('Couldn\'t delete Elastic Load Balancer (%s) due to a malformed request %s: %s.' % (elb_name, error.status, error.reason))
+        if error.status == 404: # Not Found
+            logger.error('Elastic Load Balancer (%s) was not found. Error %s: %s.' % (elb_name, error.status, error.reason))
+    logger.info('Deleted Elastic Load Balancer (%s).' % elb_name)
+
+    logger.info('Creating Elastic Load Balancer (%s).' % elb_name)
+    load_balancer = elb_connection.create_load_balancer(elb_name, # name
+                                                        None,     # zones         - Valid only for load balancers in EC2-Classic.
+                                                        listeners=[(80,80,'HTTP'),
+                                                                   (443,443,'HTTPS',cert_arn)],
+                                                        subnets=[subnet.id for subnet in subnets],
+                                                        security_groups=[sg.id],
+                                                        scheme='internet-facing', # Valid only for load balancers in EC2-VPC.
+                                                        complex_listeners=None)
+    logger.info('Created Elastic Load Balancer (%s).' % elb_name)
+    return load_balancer
+
 def main():
 
     vpc_connection = vpc.connect_vpc()
     ec2_connection = ec2.connect_ec2()
     rds_connection = rds.connect_rds()
+    elb_connection = boto.connect_elb()
 
     cidr_block = '10.0.0.0/16'
 
@@ -335,33 +366,9 @@ def main():
 
     cert_arn = upload_ssl_certificate()
 
-    sg = create_security_group()
+    sg = create_security_group(public_vpc)
 
-    logger.info('Connecting to the Amazon EC2 Load Balancing (Amazon ELB) service.')
-    elb_connection = boto.connect_elb()
-    logger.info('Connected to the Amazon EC2 Load Balancing (Amazon ELB) service.')
-
-    elb_name = '-'.join(['elb', core.PROJECT_NAME.lower(), core.args.environment.lower()])
-    logger.info('Deleting Elastic Load Balancer (%s).' % elb_name)
-    try:
-        elb_connection.delete_load_balancer(elb_name)
-    except boto.exception.BotoServerError as error:
-        if error.status == 400: # Bad Request
-            logger.error('Couldn\'t delete Elastic Load Balancer (%s) due to a malformed request %s: %s.' % (elb_name, error.status, error.reason))
-        if error.status == 404: # Not Found
-            logger.error('Elastic Load Balancer (%s) was not found. Error %s: %s.' % (elb_name, error.status, error.reason))
-    logger.info('Deleted Elastic Load Balancer (%s).' % elb_name)
-
-    logger.info('Creating Elastic Load Balancer (%s).' % elb_name)
-    elb_connection.create_load_balancer(elb_name, # name
-                                        None,     # zones         - Valid only for load balancers in EC2-Classic.
-                                        listeners=[(80,80,'HTTP'),
-                                                   (443,443,'HTTPS',cert_arn)],
-                                        subnets=[subnet.id for subnet in subnets],
-                                        security_groups=[sg.id],
-                                        scheme='internet-facing', # Valid only for load balancers in EC2-VPC.
-                                        complex_listeners=None)
-    logger.info('Created Elastic Load Balancer (%s).' % elb_name)
+    load_balancer = create_elb(sg, subnets, cert_arn)
 
     instance_profile_name = create_instance_profile(policy)
 
@@ -385,13 +392,13 @@ def main():
                                                    user_data=get_script('us-east-1', bucket.name, archive_name, bootstrap_archive_name))
         instance = reservation.instances[-1]
         instances.append(instance)
-        time.sleep(1) # required 1 second sleep
+        time.sleep(1) # required 1-second sleep
         ec2_connection.create_tags([instance.id], {"Name": ec2_instance_name})
         logger.info('Created EC2 Instance (%s).' % ec2_instance_name)
 
-    logger.info('Registering EC2 Instances with Elastic Load Balancer (%s).' % elb_name)
-    elb_connection.register_instances(elb_name, [instance.id for instance in instances])
-    logger.info('Registered EC2 Instances with Elastic Load Balancer (%s).' % elb_name)
+    logger.info('Registering EC2 Instances with Elastic Load Balancer (%s).' % load_balancer.name)
+    elb_connection.register_instances(load_balancer.name, [instance.id for instance in instances])
+    logger.info('Registered EC2 Instances with Elastic Load Balancer (%s).' % load_balancer.name)
 
     # curl http://169.254.169.254/latest/meta-data/iam/security-credentials/myrole
     # aws s3 cp --region us-east-1 s3://s3-gossamer-staging-faddde2b/gossamer.tar.gz gossamer.tar.gz
