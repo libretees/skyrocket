@@ -81,7 +81,7 @@ def create_public_vpc(vpc_connection, cidr_block):
         new_vpc.add_tag('Name', vpc_name)
     except boto.exception.EC2ResponseError as error:
         if error.status == 400: # Bad Request
-            logger.error('Could not create VPC (%s). Error %s: %s.' % (vpc_name, error.status, error.reason))
+            logger.error('Error %s: %s. Could not create VPC (%s). %s' % (error.status, error.reason, vpc_name, error.message))
 
     if new_vpc:
         igw_name = '-'.join(['igw', core.PROJECT_NAME.lower(), core.args.environment.lower()])
@@ -191,33 +191,9 @@ def get_policy(bucket):
     }""" % ','.join(arns)
     return policy
 
-def main():
+def upload_ssl_certificate():
 
-    vpc_connection = vpc.connect_vpc()
-    ec2_connection = ec2.connect_ec2()
-    rds_connection = rds.connect_rds()
-
-    cidr_block = '10.0.0.0/16'
-
-    if not validate_cidr_block(cidr_block):
-        sys.exit(1)
-
-    public_vpc = create_public_vpc(vpc_connection, cidr_block)
-    subnets = create_subnets(ec2_connection, vpc_connection, public_vpc, cidr_block)
-
-    archive_name = '.'.join([s3.PROJECT_NAME, 'tar', 'gz'])
-    logger.info('Creating deployment archive (%s).' % archive_name)
-    s3.make_tarfile(archive_name, s3.PROJECT_DIRECTORY)
-    logger.info('Created deployment archive (%s).' % archive_name)
-
-    bootstrap_archive_name = '.'.join(['configure', s3.PROJECT_NAME, 'tar', 'gz'])
-    s3.make_tarfile(bootstrap_archive_name, 'deploy')
-
-    bucket = create_bucket()
-    add_object(bucket, archive_name)
-    add_object(bucket, bootstrap_archive_name)
-    policy = get_policy(bucket)
-
+    cert_arn = None
     iam_connection = iam.connect_iam()
 
     cert_name = '-'.join(['crt', core.PROJECT_NAME.lower(), core.args.environment.lower()])
@@ -250,13 +226,99 @@ def main():
                            ['upload_server_certificate_result']\
                            ['server_certificate_metadata']\
                            ['arn']
+        time.sleep(5) # required 5 second sleep
     except boto.exception.BotoServerError as error:
         if error.status == 400: # Bad Request
             logger.error('Couldn\'t upload server certificate (%s) due to an issue with its contents and/or formatting Error %s: %s.' % (cert_name, error.status, error.reason))
         if error.status == 409: # Conflict
             logger.error('Couldn\'t upload server certificate (%s) due to Error %s: %s.' % (cert_name, error.status, error.reason))
 
+    return cert_arn
+
+def create_instance_profile(policy):
+    iam_connection = iam.connect_iam()
+
+    instance_profile_name = '-'.join(['profile', core.PROJECT_NAME.lower(), core.args.environment.lower()])
+    policy_name = '-'.join(['policy', core.PROJECT_NAME.lower(), core.args.environment.lower()])
+    role_name = '-'.join(['role', core.PROJECT_NAME.lower(), core.args.environment.lower()])
+
+    logger.info('Removing Role (%s) from Instance Profile (%s).' % (role_name, instance_profile_name))
+    try:
+        iam_connection.remove_role_from_instance_profile(instance_profile_name, role_name)
+        logger.info('Removed Role (%s) from Instance Profile (%s).' % (role_name, instance_profile_name))
+    except boto.exception.BotoServerError as error:
+        if error.status == 400: # Bad Request
+            logger.error('Error %s: %s. Couldn\'t remove Role (%s) Instance Profile (%s).' % (error.status, error.reason, role_name, instance_profile_name))
+        if error.status == 404: # Not Found
+            logger.error('Error %s: %s. Instance Profile (%s) was not found. ' % (error.status, error.reason, instance_profile_name))
+
+    logger.info('Deleting Instance Profile (%s).' % instance_profile_name)
+    try:
+        iam_connection.delete_instance_profile(instance_profile_name)
+        logger.info('Deleted Instance Profile (%s).' % instance_profile_name)
+    except boto.exception.BotoServerError as error:
+        if error.status == 400: # Bad Request
+            logger.error('Error %s: %s. Couldn\'t delete Instance Profile (%s).' % (error.status, error.reason, instance_profile_name))
+        if error.status == 404: # Not Found
+            logger.error('Error %s: %s. Instance Profile (%s) was not found. ' % (error.status, error.reason, instance_profile_name))
+
+    logger.info('Deleting Policy (%s) from Role (%s).' % (policy_name, role_name))
+    try:
+        iam_connection.delete_role_policy(role_name, policy_name)
+        logger.info('Deleted Policy (%s) from Role (%s).' % (policy_name, role_name))
+    except boto.exception.BotoServerError as error:
+        if error.status == 400: # Bad Request
+            logger.error('Error %s: %s. Couldn\'t delete Policy (%s) Role (%s).' % (error.status, error.reason, policy_name, role_name))
+        if error.status == 404: # Not Found
+            logger.error('Error %s: %s. Role (%s) was not found. ' % (error.status, error.reason, role_name))
+
+    logger.info('Deleting Role (%s).' % role_name)
+    try:
+        iam_connection.delete_role(role_name)
+        logger.info('Deleted Role (%s).' % role_name)
+    except boto.exception.BotoServerError as error:
+        if error.status == 400: # Bad Request
+            logger.error('Error %s: %s. Couldn\'t delete Role (%s).' % (error.status, error.reason, role_name))
+        if error.status == 404: # Not Found
+            logger.error('Error %s: %s. Role (%s) was not found. ' % (error.status, error.reason, role_name))
+
+    logger.info('Creating Instance Profile (%s).' % instance_profile_name)
+    instance_profile = iam_connection.create_instance_profile(instance_profile_name)
+    role = iam_connection.create_role(role_name)
+    iam_connection.add_role_to_instance_profile(instance_profile_name, role_name)
+    iam_connection.put_role_policy(role_name, policy_name, policy)
+    logger.info('Created Instance Profile (%s).' % instance_profile_name)
     time.sleep(5) # required 5 second sleep
+    return instance_profile_name
+
+def main():
+
+    vpc_connection = vpc.connect_vpc()
+    ec2_connection = ec2.connect_ec2()
+    rds_connection = rds.connect_rds()
+
+    cidr_block = '10.0.0.0/16'
+
+    if not validate_cidr_block(cidr_block):
+        sys.exit(1)
+
+    public_vpc = create_public_vpc(vpc_connection, cidr_block)
+    subnets = create_subnets(ec2_connection, vpc_connection, public_vpc, cidr_block)
+
+    archive_name = '.'.join([s3.PROJECT_NAME, 'tar', 'gz'])
+    logger.info('Creating deployment archive (%s).' % archive_name)
+    s3.make_tarfile(archive_name, s3.PROJECT_DIRECTORY)
+    logger.info('Created deployment archive (%s).' % archive_name)
+
+    bootstrap_archive_name = '.'.join(['configure', s3.PROJECT_NAME, 'tar', 'gz'])
+    s3.make_tarfile(bootstrap_archive_name, 'deploy')
+
+    bucket = create_bucket()
+    add_object(bucket, archive_name)
+    add_object(bucket, bootstrap_archive_name)
+    policy = get_policy(bucket)
+
+    cert_arn = upload_ssl_certificate()
 
     logger.info('Connecting to the Amazon EC2 Load Balancing (Amazon ELB) service.')
     elb_connection = boto.connect_elb()
@@ -297,31 +359,7 @@ def main():
                                         complex_listeners=None)
     logger.info('Created Elastic Load Balancer (%s).' % elb_name)
 
-    instance_profile_name = '-'.join(['profile', core.PROJECT_NAME.lower(), core.args.environment.lower()])
-    policy_name = '-'.join(['policy', core.PROJECT_NAME.lower(), core.args.environment.lower()])
-    role_name = '-'.join(['role', core.PROJECT_NAME.lower(), core.args.environment.lower()])
-
-    logger.info('Deleting instance profile (%s).' % instance_profile_name)
-    try:
-        iam_connection.remove_role_from_instance_profile(instance_profile_name, role_name)
-        iam_connection.delete_instance_profile(instance_profile_name)
-        iam_connection.delete_role_policy(role_name, policy_name)
-        iam_connection.delete_role(role_name)
-    except boto.exception.BotoServerError as error:
-        if error.status == 400: # Bad Request
-            logger.error('Couldn\'t delete instance profile (%s) due to a malformed request %s: %s.' % (instance_profile_name, error.status, error.reason))
-        if error.status == 404: # Not Found
-            logger.error('Instance profile (%s) was not found. Error %s: %s.' % (instance_profile_name, error.status, error.reason))
-    logger.info('Deleted instance profile (%s).' % instance_profile_name)
-
-    logger.info('Creating instance profile (%s).' % instance_profile_name)
-    instance_profile = iam_connection.create_instance_profile(instance_profile_name)
-    role = iam_connection.create_role(role_name)
-    iam_connection.add_role_to_instance_profile(instance_profile_name, role_name)
-    iam_connection.put_role_policy(role_name, policy_name, policy)
-    logger.info('Created instance profile (%s).' % instance_profile_name)
-
-    time.sleep(5) # required 5 second sleep
+    instance_profile_name = create_instance_profile(policy)
 
     instances = list()
     for subnet in subnets:
