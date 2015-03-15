@@ -138,7 +138,7 @@ def create_subnets(ec2_connection, vpc_connection, vpc, cidr_block):
                                                                                         # .0 for the network, .1 for the gateway,
                                                                                         # .3 for DHCP services, and .255 for broadcast.
         try:
-            logger.info('Creating subnet (%s) with %d available IP addresses.' % (subnet_name, available_ips))
+            logger.info('Creating subnet (%s) with %s available IP addresses.' % (subnet_name, '{:,}'.format(available_ips)))
             subnet = vpc_connection.create_subnet(vpc.id,                      # vpc_id
                                                   subnet_cidr_block,           # cidr_block
                                                   availability_zone=zone.name,
@@ -177,7 +177,7 @@ def add_object(bucket, obj):
     key = bucket.new_key(obj)
     key.set_contents_from_filename(obj, policy='private')
 
-def get_policy(bucket):
+def get_bucket_policy(bucket):
     arns = ['"arn:aws:s3:::'+bucket.name+'/'+key.name+'"' for key in bucket.get_all_keys()]
     policy = """{
         "Version": "2012-10-17",
@@ -316,7 +316,7 @@ def main():
     bucket = create_bucket()
     add_object(bucket, archive_name)
     add_object(bucket, bootstrap_archive_name)
-    policy = get_policy(bucket)
+    policy = get_bucket_policy(bucket)
 
     cert_arn = upload_ssl_certificate()
 
@@ -370,7 +370,7 @@ def main():
         logger.info('Created Elastic Network Interface (ENI).')
         interfaces = boto.ec2.networkinterface.NetworkInterfaceCollection(interface)
 
-        ec2_instance_name = '-'.join(['ec2', core.PROJECT_NAME.lower(), core.args.environment.lower(), '%x' % random.randrange(2**32)])
+        ec2_instance_name = '-'.join(['ec2', core.PROJECT_NAME.lower(), core.args.environment.lower(), '{:08x}'.format(random.randrange(2**32))])
         logger.info('Creating EC2 Instance (%s) in %s.' % (ec2_instance_name, subnet.availability_zone))
         reservation = ec2_connection.run_instances('ami-9a562df2',
                                                    instance_type='t2.micro',
