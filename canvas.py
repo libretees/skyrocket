@@ -173,6 +173,24 @@ def create_bucket():
 
     return bucket
 
+def add_object(bucket, obj):
+    key = bucket.new_key(obj)
+    key.set_contents_from_filename(obj, policy='private')
+
+def get_policy(bucket):
+    arns = ['"arn:aws:s3:::'+bucket.name+'/'+key.name+'"' for key in bucket.get_all_keys()]
+    policy = """{
+        "Version": "2012-10-17",
+        "Statement": [{
+            "Effect": "Allow",
+            "Action": [
+                "s3:GetObject"
+            ],
+            "Resource": [%s]
+        }]
+    }""" % ','.join(arns)
+    return policy
+
 def main():
 
     vpc_connection = vpc.connect_vpc()
@@ -196,24 +214,9 @@ def main():
     s3.make_tarfile(bootstrap_archive_name, 'deploy')
 
     bucket = create_bucket()
-
-    key = bucket.new_key(archive_name)
-    key.set_contents_from_filename(archive_name, policy='private')
-    key = bucket.new_key(bootstrap_archive_name)
-    key.set_contents_from_filename(bootstrap_archive_name, policy='private')
-
-    policy = """{
-        "Version": "2012-10-17",
-        "Statement": [{
-            "Effect": "Allow",
-            "Action": [
-                "s3:GetObject"
-            ],
-            "Resource": ["arn:aws:s3:::%s/%s",
-                         "arn:aws:s3:::%s/%s"]
-        }]
-    }""" % (bucket.name, archive_name, bucket.name, bootstrap_archive_name)
-
+    add_object(bucket, archive_name)
+    add_object(bucket, bootstrap_archive_name)
+    policy = get_policy(bucket)
 
     iam_connection = iam.connect_iam()
 
