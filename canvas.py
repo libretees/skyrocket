@@ -291,6 +291,21 @@ def create_instance_profile(policy):
     time.sleep(5) # required 5 second sleep
     return instance_profile_name
 
+def create_security_group():
+    sg_name = '-'.join(['gp', core.PROJECT_NAME.lower(), core.args.environment.lower()])
+    logger.info('Creating security group (%s).' % sg_name)
+    sg = ec2_connection.create_security_group(sg_name, 'Security Group Description', vpc_id=public_vpc.id)
+    logger.info('Created security group (%s).' % sg_name)
+
+    sg.authorize('tcp', from_port=80, to_port=80, cidr_ip='0.0.0.0/0')
+    sg.authorize('tcp', from_port=443, to_port=443, cidr_ip='0.0.0.0/0')
+    ec2_connection.revoke_security_group_egress(sg.id, -1, from_port=0, to_port=65535, cidr_ip='0.0.0.0/0')
+    ec2_connection.authorize_security_group_egress(sg.id, 'tcp', from_port=53, to_port=53, cidr_ip='0.0.0.0/0')
+    ec2_connection.authorize_security_group_egress(sg.id, 'udp', from_port=53, to_port=53, cidr_ip='0.0.0.0/0')
+    ec2_connection.authorize_security_group_egress(sg.id, 'tcp', from_port=80, to_port=80, cidr_ip='0.0.0.0/0')
+    ec2_connection.authorize_security_group_egress(sg.id, 'tcp', from_port=443, to_port=443, cidr_ip='0.0.0.0/0')
+    return sg
+
 def main():
 
     vpc_connection = vpc.connect_vpc()
@@ -320,22 +335,11 @@ def main():
 
     cert_arn = upload_ssl_certificate()
 
+    sg = create_security_group()
+
     logger.info('Connecting to the Amazon EC2 Load Balancing (Amazon ELB) service.')
     elb_connection = boto.connect_elb()
     logger.info('Connected to the Amazon EC2 Load Balancing (Amazon ELB) service.')
-
-    sg_name = '-'.join(['gp', core.PROJECT_NAME.lower(), core.args.environment.lower()])
-    logger.info('Creating security group (%s).' % sg_name)
-    sg = ec2_connection.create_security_group(sg_name, 'Security Group Description', vpc_id=public_vpc.id)
-    logger.info('Created security group (%s).' % sg_name)
-
-    sg.authorize('tcp', from_port=80, to_port=80, cidr_ip='0.0.0.0/0')
-    sg.authorize('tcp', from_port=443, to_port=443, cidr_ip='0.0.0.0/0')
-    ec2_connection.revoke_security_group_egress(sg.id, -1, from_port=0, to_port=65535, cidr_ip='0.0.0.0/0')
-    ec2_connection.authorize_security_group_egress(sg.id, 'tcp', from_port=53, to_port=53, cidr_ip='0.0.0.0/0')
-    ec2_connection.authorize_security_group_egress(sg.id, 'udp', from_port=53, to_port=53, cidr_ip='0.0.0.0/0')
-    ec2_connection.authorize_security_group_egress(sg.id, 'tcp', from_port=80, to_port=80, cidr_ip='0.0.0.0/0')
-    ec2_connection.authorize_security_group_egress(sg.id, 'tcp', from_port=443, to_port=443, cidr_ip='0.0.0.0/0')
 
     elb_name = '-'.join(['elb', core.PROJECT_NAME.lower(), core.args.environment.lower()])
     logger.info('Deleting Elastic Load Balancer (%s).' % elb_name)
