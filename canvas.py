@@ -338,30 +338,44 @@ def create_elb(sg, subnets, cert_arn):
 
 def create_ec2_instances(security_groups, subnets, script, instance_profile_name):
     instances = list()
-    ec2_connection = ec2.connect_ec2()
     for subnet in subnets:
-        logger.info('Creating Elastic Network Interface (ENI).')
-        interface = boto.ec2.networkinterface.NetworkInterfaceSpecification(subnet_id=subnet.id,
-                                                                            groups=[sg.id for sg in security_groups],
-                                                                            associate_public_ip_address=True)
-        logger.info('Created Elastic Network Interface (ENI).')
-        interfaces = boto.ec2.networkinterface.NetworkInterfaceCollection(interface)
-
-        ec2_instance_name = '-'.join(['ec2', core.PROJECT_NAME.lower(), core.args.environment.lower(), '{:08x}'.format(random.randrange(2**32))])
-        logger.info('Creating EC2 Instance (%s) in %s.' % (ec2_instance_name, subnet.availability_zone))
-        reservation = ec2_connection.run_instances('ami-9a562df2',
-                                                   instance_type='t2.micro',
-                                                   #security_group_ids=[sg.id], - Not required when an ENI is specified.
-                                                   #subnet_id=subnet.id,        - Not required when an ENI is specified.
-                                                   instance_profile_name=instance_profile_name,
-                                                   network_interfaces=interfaces,
-                                                   user_data=script)
-        instance = reservation.instances[-1]
+        instance = create_ec2_instance(security_groups, subnet, script, instance_profile_name)
         instances.append(instance)
-        time.sleep(1) # required 1-second sleep
-        ec2_connection.create_tags([instance.id], {"Name": ec2_instance_name})
-        logger.info('Created EC2 Instance (%s).' % ec2_instance_name)
     return instances
+
+def create_ec2_instance(security_groups, subnet, script, instance_profile_name):
+    ec2_connection = ec2.connect_ec2()
+    logger.info('Creating Elastic Network Interface (ENI).')
+    interface = boto.ec2.networkinterface.NetworkInterfaceSpecification(subnet_id=subnet.id,
+                                                                        groups=[sg.id for sg in security_groups],
+                                                                        associate_public_ip_address=True)
+    logger.info('Created Elastic Network Interface (ENI).')
+    interfaces = boto.ec2.networkinterface.NetworkInterfaceCollection(interface)
+
+    ec2_instance_name = '-'.join(['ec2', core.PROJECT_NAME.lower(), core.args.environment.lower(), '{:08x}'.format(random.randrange(2**32))])
+    logger.info('Creating EC2 Instance (%s) in %s.' % (ec2_instance_name, subnet.availability_zone))
+    reservation = ec2_connection.run_instances('ami-9a562df2',
+                                               instance_type='t2.micro',
+                                               #security_group_ids=[sg.id], - Not required when an ENI is specified.
+                                               #subnet_id=subnet.id,        - Not required when an ENI is specified.
+                                               instance_profile_name=instance_profile_name,
+                                               network_interfaces=interfaces,
+                                               user_data=script)
+    logger.info('Created EC2 Instance (%s).' % ec2_instance_name)
+
+    # Get EC2 Instance.
+    instance = reservation.instances[-1]
+
+    # Wait for instance to register before tagging it.
+    status = instance.update()
+    while not status == 'pending':
+        time.sleep(1)
+        status = instance.update()
+
+    # Tag instance.
+    ec2_connection.create_tags([instance.id], {"Name": ec2_instance_name})
+
+    return instance
 
 def main():
 
