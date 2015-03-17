@@ -1,5 +1,8 @@
+import time
+import random
 import logging
 import boto
+import iam
 import core
 
 logger = logging.getLogger(__name__)
@@ -11,3 +14,147 @@ def connect_ec2():
     logger.info('Connected to Amazon EC2.')
 
     return ec2
+
+def create_instance_profile(policy):
+    iam_connection = iam.connect_iam()
+
+    instance_profile_name = '-'.join(['profile', core.PROJECT_NAME.lower(), core.args.environment.lower()])
+    policy_name = '-'.join(['policy', core.PROJECT_NAME.lower(), core.args.environment.lower()])
+    role_name = '-'.join(['role', core.PROJECT_NAME.lower(), core.args.environment.lower()])
+
+    logger.info('Removing Role (%s) from Instance Profile (%s).' % (role_name, instance_profile_name))
+    try:
+        iam_connection.remove_role_from_instance_profile(instance_profile_name, role_name)
+        logger.info('Removed Role (%s) from Instance Profile (%s).' % (role_name, instance_profile_name))
+    except boto.exception.BotoServerError as error:
+        if error.status == 400: # Bad Request
+            logger.error('Error %s: %s. Couldn\'t remove Role (%s) Instance Profile (%s).' % (error.status, error.reason, role_name, instance_profile_name))
+        if error.status == 404: # Not Found
+            logger.error('Error %s: %s. Instance Profile (%s) was not found. ' % (error.status, error.reason, instance_profile_name))
+
+    logger.info('Deleting Instance Profile (%s).' % instance_profile_name)
+    try:
+        iam_connection.delete_instance_profile(instance_profile_name)
+        logger.info('Deleted Instance Profile (%s).' % instance_profile_name)
+    except boto.exception.BotoServerError as error:
+        if error.status == 400: # Bad Request
+            logger.error('Error %s: %s. Couldn\'t delete Instance Profile (%s).' % (error.status, error.reason, instance_profile_name))
+        if error.status == 404: # Not Found
+            logger.error('Error %s: %s. Instance Profile (%s) was not found. ' % (error.status, error.reason, instance_profile_name))
+
+    logger.info('Deleting Policy (%s) from Role (%s).' % (policy_name, role_name))
+    try:
+        iam_connection.delete_role_policy(role_name, policy_name)
+        logger.info('Deleted Policy (%s) from Role (%s).' % (policy_name, role_name))
+    except boto.exception.BotoServerError as error:
+        if error.status == 400: # Bad Request
+            logger.error('Error %s: %s. Couldn\'t delete Policy (%s) Role (%s).' % (error.status, error.reason, policy_name, role_name))
+        if error.status == 404: # Not Found
+            logger.error('Error %s: %s. Role (%s) was not found. ' % (error.status, error.reason, role_name))
+
+    logger.info('Deleting Role (%s).' % role_name)
+    try:
+        iam_connection.delete_role(role_name)
+        logger.info('Deleted Role (%s).' % role_name)
+    except boto.exception.BotoServerError as error:
+        if error.status == 400: # Bad Request
+            logger.error('Error %s: %s. Couldn\'t delete Role (%s).' % (error.status, error.reason, role_name))
+        if error.status == 404: # Not Found
+            logger.error('Error %s: %s. Role (%s) was not found. ' % (error.status, error.reason, role_name))
+
+    logger.info('Creating Instance Profile (%s).' % instance_profile_name)
+    instance_profile = iam_connection.create_instance_profile(instance_profile_name)
+    role = iam_connection.create_role(role_name)
+    iam_connection.add_role_to_instance_profile(instance_profile_name, role_name)
+    iam_connection.put_role_policy(role_name, policy_name, policy)
+    logger.info('Created Instance Profile (%s).' % instance_profile_name)
+    time.sleep(5) # required 5-second sleep
+    return instance_profile_name
+
+def create_security_group(vpc):
+    ec2_connection = connect_ec2()
+    sg_name = '-'.join(['gp', core.PROJECT_NAME.lower(), core.args.environment.lower()])
+    logger.info('Creating security group (%s).' % sg_name)
+    sg = ec2_connection.create_security_group(sg_name, 'Security Group Description', vpc_id=vpc.id)
+    logger.info('Created security group (%s).' % sg_name)
+
+    sg.authorize('tcp', from_port=80, to_port=80, cidr_ip='0.0.0.0/0')
+    sg.authorize('tcp', from_port=443, to_port=443, cidr_ip='0.0.0.0/0')
+    ec2_connection.revoke_security_group_egress(sg.id, -1, from_port=0, to_port=65535, cidr_ip='0.0.0.0/0')
+    ec2_connection.authorize_security_group_egress(sg.id, 'tcp', from_port=53, to_port=53, cidr_ip='0.0.0.0/0')
+    ec2_connection.authorize_security_group_egress(sg.id, 'udp', from_port=53, to_port=53, cidr_ip='0.0.0.0/0')
+    ec2_connection.authorize_security_group_egress(sg.id, 'tcp', from_port=80, to_port=80, cidr_ip='0.0.0.0/0')
+    ec2_connection.authorize_security_group_egress(sg.id, 'tcp', from_port=443, to_port=443, cidr_ip='0.0.0.0/0')
+    return sg
+
+def create_elb(sg, subnets, cert_arn):
+    logger.info('Connecting to the Amazon EC2 Load Balancing (Amazon ELB) service.')
+    elb_connection = boto.connect_elb()
+    logger.info('Connected to the Amazon EC2 Load Balancing (Amazon ELB) service.')
+
+    elb_name = '-'.join(['elb', core.PROJECT_NAME.lower(), core.args.environment.lower()])
+    logger.info('Deleting Elastic Load Balancer (%s).' % elb_name)
+    try:
+        elb_connection.delete_load_balancer(elb_name)
+    except boto.exception.BotoServerError as error:
+        if error.status == 400: # Bad Request
+            logger.error('Couldn\'t delete Elastic Load Balancer (%s) due to a malformed request %s: %s.' % (elb_name, error.status, error.reason))
+        if error.status == 404: # Not Found
+            logger.error('Elastic Load Balancer (%s) was not found. Error %s: %s.' % (elb_name, error.status, error.reason))
+    logger.info('Deleted Elastic Load Balancer (%s).' % elb_name)
+
+    logger.info('Creating Elastic Load Balancer (%s).' % elb_name)
+    load_balancer = elb_connection.create_load_balancer(elb_name, # name
+                                                        None,     # zones         - Valid only for load balancers in EC2-Classic.
+                                                        listeners=[(80,80,'HTTP'),
+                                                                   (443,443,'HTTPS',cert_arn)],
+                                                        subnets=[subnet.id for subnet in subnets],
+                                                        security_groups=[sg.id],
+                                                        scheme='internet-facing', # Valid only for load balancers in EC2-VPC.
+                                                        complex_listeners=None)
+    logger.info('Created Elastic Load Balancer (%s).' % elb_name)
+    return load_balancer
+
+def create_ec2_instances(security_groups, subnets, script, instance_profile_name):
+    instances = list()
+    for subnet in subnets:
+        instance = create_ec2_instance(security_groups, subnet, script, instance_profile_name)
+        instances.append(instance)
+    return instances
+
+def create_ec2_instance(security_groups, subnet, script, instance_profile_name):
+    ec2_connection = connect_ec2()
+    logger.info('Creating Elastic Network Interface (ENI).')
+    interface = boto.ec2.networkinterface.NetworkInterfaceSpecification(subnet_id=subnet.id,
+                                                                        groups=[sg.id for sg in security_groups],
+                                                                        associate_public_ip_address=True)
+    logger.info('Created Elastic Network Interface (ENI).')
+    interfaces = boto.ec2.networkinterface.NetworkInterfaceCollection(interface)
+
+    ec2_instance_name = '-'.join(['ec2', core.PROJECT_NAME.lower(), core.args.environment.lower(), '{:08x}'.format(random.randrange(2**32))])
+    logger.info('Creating EC2 Instance (%s) in %s.' % (ec2_instance_name, subnet.availability_zone))
+    reservation = ec2_connection.run_instances('ami-9a562df2',
+                                               instance_type='t2.micro',
+                                               #security_group_ids=[sg.id], - Not required when an ENI is specified.
+                                               #subnet_id=subnet.id,        - Not required when an ENI is specified.
+                                               instance_profile_name=instance_profile_name,
+                                               network_interfaces=interfaces,
+                                               user_data=script)
+    logger.info('Created EC2 Instance (%s).' % ec2_instance_name)
+
+    # Get EC2 Instance.
+    instance = reservation.instances[-1]
+
+    # Tag instance.
+    tagged = False
+    while not tagged:
+        try:
+            tagged = ec2_connection.create_tags([instance.id], {"Name": ec2_instance_name})
+        except boto.exception.EC2ResponseError as error:
+            if error.code == 'InvalidInstanceID.NotFound': # Instance hasn't registered with EC2 service yet.
+                logger.info('missed tagging...')
+                pass
+            else:
+                raise boto.exception.EC2ResponseError
+
+    return instance
