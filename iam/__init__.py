@@ -13,6 +13,100 @@ def connect_iam():
 
     return iam
 
+def delete_role(role_name):
+    # Connect to the Amazon Identity and Access Management (Amazon IAM) service.
+    iam_connection = connect_iam()
+
+    # Get a list of all Instance Profiles associated to the Role.
+    instance_profiles = None
+    try:
+        response = iam_connection.list_instance_profiles_for_role(role_name)
+        instance_profiles = response['list_instance_profiles_for_role_response']\
+                                    ['list_instance_profiles_for_role_result']\
+                                    ['instance_profiles']
+    except boto.exception.BotoServerError as error:
+        if error.status == 404: # Not Found
+            logger.error('Error %s: %s. Role (%s) was not found. ' % (error.status, error.reason, role_name))
+
+    # Get a list of all Role Policies associated to the Role.
+    role_policies = None
+    try:
+        response = iam_connection.list_role_policies(role_name)
+        role_policies = response['list_role_policies_response']\
+                                ['list_role_policies_result']\
+                                ['policy_names']
+    except boto.exception.BotoServerError as error:
+        if error.status == 404: # Not Found
+            logger.error('Error %s: %s. Role (%s) was not found. ' % (error.status, error.reason, role_name))
+
+    # Remove Role from Instance Profiles.
+    if instance_profiles:
+        instance_profile_names = [instance_profile['instance_profile_name'] for instance_profile in instance_profiles]
+        for instance_profile_name in instance_profile_names:
+            logger.info('Removing Role (%s) from Instance Profile (%s).' % (role_name, instance_profile_name))
+            try:
+                iam_connection.remove_role_from_instance_profile(instance_profile_name, role_name)
+                logger.info('Removed Role (%s) from Instance Profile (%s).' % (role_name, instance_profile_name))
+            except boto.exception.BotoServerError as error:
+                if error.status == 400: # Bad Request
+                    logger.error('Error %s: %s. Couldn\'t remove Role (%s) Instance Profile (%s).' % (error.status, error.reason, role_name, instance_profile_name))
+                if error.status == 404: # Not Found
+                    logger.error('Error %s: %s. Instance Profile (%s) was not found. ' % (error.status, error.reason, instance_profile_name))
+
+            # Delete Instance Profile.
+            logger.info('Deleting Instance Profile (%s).' % instance_profile_name)
+            try:
+                iam_connection.delete_instance_profile(instance_profile_name)
+                logger.info('Deleted Instance Profile (%s).' % instance_profile_name)
+            except boto.exception.BotoServerError as error:
+                if error.status == 400: # Bad Request
+                    logger.error('Error %s: %s. Couldn\'t delete Instance Profile (%s).' % (error.status, error.reason, instance_profile_name))
+                if error.status == 404: # Not Found
+                    logger.error('Error %s: %s. Instance Profile (%s) was not found. ' % (error.status, error.reason, instance_profile_name))
+
+    # Delete Role Policies from Role.
+    if role_policies:
+        for role_policy in role_policies:
+            logger.info('Deleting Role Policy (%s) from Role (%s).' % (role_policy, role_name))
+            try:
+                iam_connection.delete_role_policy(role_name, role_policy)
+                logger.info('Deleted Role Policy (%s) from Role (%s).' % (role_policy, role_name))
+            except boto.exception.BotoServerError as error:
+                if error.status == 400: # Bad Request
+                    logger.error('Error %s: %s. Couldn\'t delete Policy (%s) Role (%s).' % (error.status, error.reason, role_policy, role_name))
+                if error.status == 404: # Not Found
+                    logger.error('Error %s: %s. Role (%s) was not found. ' % (error.status, error.reason, role_name))
+
+    # Delete Role.
+    logger.info('Deleting Role (%s).' % role_name)
+    try:
+        iam_connection.delete_role(role_name)
+        logger.info('Deleted Role (%s).' % role_name)
+    except boto.exception.BotoServerError as error:
+        if error.status == 400: # Bad Request
+            logger.error('Error %s: %s. Couldn\'t delete Role (%s).' % (error.status, error.reason, role_name))
+        if error.status == 404: # Not Found
+            logger.error('Error %s: %s. Role (%s) was not found. ' % (error.status, error.reason, role_name))
+
+def create_instance_profile(policy):
+    iam_connection = connect_iam()
+
+    # Generate object/instance names.
+    instance_profile_name = '-'.join(['role', core.PROJECT_NAME.lower(), core.args.environment.lower()])
+    policy_name = '-'.join(['policy', core.PROJECT_NAME.lower(), core.args.environment.lower()])
+    role_name = '-'.join(['role', core.PROJECT_NAME.lower(), core.args.environment.lower()])
+
+    delete_role(role_name)
+
+    logger.info('Creating Instance Profile (%s).' % instance_profile_name)
+    instance_profile = iam_connection.create_instance_profile(instance_profile_name)
+    role = iam_connection.create_role(role_name)
+    iam_connection.add_role_to_instance_profile(instance_profile_name, role_name)
+    iam_connection.put_role_policy(role_name, policy_name, policy)
+    logger.info('Created Instance Profile (%s).' % instance_profile_name)
+    time.sleep(5) # required 5-second sleep
+    return instance_profile_name
+
 def upload_ssl_certificate():
     cert_arn = None
     iam_connection = connect_iam()
