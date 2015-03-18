@@ -63,7 +63,7 @@ def main():
     load_balancer = ec2.create_elb(sg, subnets, cert_arn)
 
     script = get_script('us-east-1', bucket.name, archive_name, bootstrap_archive_name)
-    instance_profile_name = ec2.create_instance_profile(policy)
+    instance_profile_name = ec2.create_role([policy])
 
     instances = ec2.create_ec2_instances([sg], subnets, script, instance_profile_name)
 

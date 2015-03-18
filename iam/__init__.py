@@ -1,4 +1,5 @@
 import time
+import random
 import logging
 import boto
 import core
@@ -88,24 +89,30 @@ def delete_role(role_name):
         if error.status == 404: # Not Found
             logger.error('Error %s: %s. Role (%s) was not found. ' % (error.status, error.reason, role_name))
 
-def create_instance_profile(policy):
+def create_role(inline_policies):
+    # Connect to the Amazon Identity and Access Management (Amazon IAM) service.
     iam_connection = connect_iam()
 
-    # Generate object/instance names.
-    instance_profile_name = '-'.join(['role', core.PROJECT_NAME.lower(), core.args.environment.lower()])
-    policy_name = '-'.join(['policy', core.PROJECT_NAME.lower(), core.args.environment.lower()])
+    # Create Role.
     role_name = '-'.join(['role', core.PROJECT_NAME.lower(), core.args.environment.lower()])
-
     delete_role(role_name)
-
-    logger.info('Creating Instance Profile (%s).' % instance_profile_name)
-    instance_profile = iam_connection.create_instance_profile(instance_profile_name)
+    logger.info('Creating Role (%s).' % role_name)
     role = iam_connection.create_role(role_name)
+    logger.info('Created Role (%s).' % role_name)
+
+    # Set up Instance Profile.
+    instance_profile_name = '-'.join(['role', core.PROJECT_NAME.lower(), core.args.environment.lower()])
+    instance_profile = iam_connection.create_instance_profile(instance_profile_name)
     iam_connection.add_role_to_instance_profile(instance_profile_name, role_name)
-    iam_connection.put_role_policy(role_name, policy_name, policy)
-    logger.info('Created Instance Profile (%s).' % instance_profile_name)
-    time.sleep(5) # required 5-second sleep
-    return instance_profile_name
+
+    # Attach Inline Policies to Role.
+    for inline_policy in inline_policies:
+        role_policy_name = '-'.join(['policy', core.PROJECT_NAME.lower(), core.args.environment.lower(), '{:08x}'.format(random.randrange(2**32))])
+        iam_connection.put_role_policy(role_name, role_policy_name, inline_policy)
+
+    # Allow time for Role to register with Amazon IAM service.
+    time.sleep(5) # Required 5-second sleep.
+    return role_name
 
 def upload_ssl_certificate():
     cert_arn = None
