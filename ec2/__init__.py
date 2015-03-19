@@ -93,7 +93,9 @@ def create_ec2_instance(security_groups, subnet, script, instance_profile_name):
     tagged = False
     while not tagged:
         try:
-            tagged = ec2_connection.create_tags([instance.id], {"Name": ec2_instance_name})
+            tagged = ec2_connection.create_tags([instance.id], {"Name": ec2_instance_name,
+                                                                "Project": core.PROJECT_NAME.lower(),
+                                                                "Environment": core.args.environment.lower()})
         except boto.exception.EC2ResponseError as error:
             if error.code == 'InvalidInstanceID.NotFound': # Instance hasn't registered with EC2 service yet.
                 logger.info('missed tagging...')
