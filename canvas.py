@@ -75,7 +75,9 @@ def main():
     reservations = ec2_connection.get_all_instances(filters={'tag:Project': core.PROJECT_NAME.lower(),
                                                              'tag:Environment': core.args.environment.lower()})
     instances = [i for r in reservations for i in r.instances]
-    print(instances)
+
+    # Terminate EC2 instances.
+    ec2_connection.terminate_instances(instance_ids=[instance.id for instance in instances])
 
     # curl http://169.254.169.254/latest/meta-data/iam/security-credentials/myrole
     # aws s3 cp --region us-east-1 s3://s3-gossamer-staging-faddde2b/gossamer.tar.gz gossamer.tar.gz
