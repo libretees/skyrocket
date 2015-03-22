@@ -67,20 +67,26 @@ def create_ec2_instances(security_groups, subnets, script, instance_profile_name
     return instances
 
 def create_ec2_instance(security_groups, subnet, script, instance_profile_name):
+    # Connect to the Amazon Elastic Compute Cloud (Amazon EC2) service.
     ec2_connection = connect_ec2()
-    logger.info('Creating Elastic Network Interface (ENI).')
+
+    # Generate random identifier.
+    random_id = '{:08x}'.format(random.randrange(2**32))
+
+    # Generate Elastic Network Interface (ENI) name.
+    eni_name = '-'.join(['eni', core.PROJECT_NAME.lower(), core.args.environment.lower(), random_id])
+
+    # Create Elastic Network Interface (ENI) specification.
     interface = boto.ec2.networkinterface.NetworkInterfaceSpecification(subnet_id=subnet.id,
                                                                         groups=[sg.id for sg in security_groups],
                                                                         associate_public_ip_address=True)
-    logger.info('Created Elastic Network Interface (ENI).')
     interfaces = boto.ec2.networkinterface.NetworkInterfaceCollection(interface)
 
-    ec2_instance_name = '-'.join(['ec2', core.PROJECT_NAME.lower(), core.args.environment.lower(), '{:08x}'.format(random.randrange(2**32))])
+    # Create EC2 Instance.
+    ec2_instance_name = '-'.join(['ec2', core.PROJECT_NAME.lower(), core.args.environment.lower(), random_id])
     logger.info('Creating EC2 Instance (%s) in %s.' % (ec2_instance_name, subnet.availability_zone))
     reservation = ec2_connection.run_instances('ami-9a562df2',
                                                instance_type='t2.micro',
-                                               #security_group_ids=[sg.id], - Not required when an ENI is specified.
-                                               #subnet_id=subnet.id,        - Not required when an ENI is specified.
                                                instance_profile_name=instance_profile_name,
                                                network_interfaces=interfaces,
                                                user_data=script)
@@ -89,16 +95,31 @@ def create_ec2_instance(security_groups, subnet, script, instance_profile_name):
     # Get EC2 Instance.
     instance = reservation.instances[-1]
 
-    # Tag instance.
+    # Tag EC2 Instance.
     tagged = False
     while not tagged:
         try:
-            tagged = ec2_connection.create_tags([instance.id], {"Name": ec2_instance_name,
-                                                                "Project": core.PROJECT_NAME.lower(),
-                                                                "Environment": core.args.environment.lower()})
+            tagged = ec2_connection.create_tags([instance.id], {'Name': ec2_instance_name,
+                                                                'Project': core.PROJECT_NAME.lower(),
+                                                                'Environment': core.args.environment.lower()})
         except boto.exception.EC2ResponseError as error:
             if error.code == 'InvalidInstanceID.NotFound': # Instance hasn't registered with EC2 service yet.
-                logger.info('missed tagging...')
+                pass
+            else:
+                raise boto.exception.EC2ResponseError
+
+    # Get Elastic Network Interface (ENI) attached to instance.
+    interfaces = ec2_connection.get_all_network_interfaces(filters={'attachment.instance-id': instance.id})
+
+    # Tag Elastic Network Interface (ENI).
+    tagged = False
+    while not tagged:
+        try:
+            tagged = ec2_connection.create_tags([interface.id for interface in interfaces], {'Name': eni_name,
+                                                                                             'Project': core.PROJECT_NAME.lower(),
+                                                                                             'Environment': core.args.environment.lower()})
+        except boto.exception.EC2ResponseError as error:
+            if error.code == 'InvalidNetworkInterfaceID.NotFound': # ENI hasn't registered with EC2 service yet.
                 pass
             else:
                 raise boto.exception.EC2ResponseError
