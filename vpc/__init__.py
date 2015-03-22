@@ -4,6 +4,7 @@ import ipaddress
 import logging
 from operator import itemgetter
 import boto
+import ec2
 import core
 
 logger = logging.getLogger(__name__)
@@ -53,6 +54,9 @@ def validate_cidr_block(cidr_block):
         return False
 
 def create_public_vpc(vpc_connection, cidr_block):
+    # Connect to the Amazon Elastic Compute Cloud (Amazon EC2) service.
+    ec2_connection = ec2.connect_ec2()
+
     vpc_name = '-'.join(['vpc', core.PROJECT_NAME.lower(), core.args.environment.lower()])
     new_vpc = None
     try:
@@ -61,7 +65,20 @@ def create_public_vpc(vpc_connection, cidr_block):
                                             instance_tenancy='default',
                                             dry_run=False)
         logger.info('Created Virtual Private Cloud (VPC) (%s).' % vpc_name)
-        new_vpc.add_tag('Name', vpc_name)
+
+        # Tag VPC.
+        tagged = False
+        while not tagged:
+            try:
+                tagged = ec2_connection.create_tags([new_vpc.id], {'Name': vpc_name,
+                                                                   'Project': core.PROJECT_NAME.lower(),
+                                                                   'Environment': core.args.environment.lower()})
+            except boto.exception.EC2ResponseError as error:
+                if error.code == 'InvalidVpcID.NotFound': # VPC hasn't registered with Virtual Private Cloud (VPC) service yet.
+                    pass
+                else:
+                    raise boto.exception.EC2ResponseError
+
     except boto.exception.EC2ResponseError as error:
         if error.status == 400: # Bad Request
             logger.error('Error %s: %s. Could not create VPC (%s). %s' % (error.status, error.reason, vpc_name, error.message))
