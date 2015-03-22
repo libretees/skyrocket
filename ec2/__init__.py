@@ -119,7 +119,8 @@ def create_ec2_instance(security_groups, subnet, script, instance_profile_name):
                                                                                              'Project': core.PROJECT_NAME.lower(),
                                                                                              'Environment': core.args.environment.lower()})
         except boto.exception.EC2ResponseError as error:
-            if error.code == 'InvalidNetworkInterfaceID.NotFound': # ENI hasn't registered with EC2 service yet.
+            if error.code == 'InvalidNetworkInterfaceID.NotFound' or \
+               error.code == 'InvalidInstanceID.NotFound':             # ENI hasn't registered with EC2 service yet.
                 pass
             else:
                 raise boto.exception.EC2ResponseError
