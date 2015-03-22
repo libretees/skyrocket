@@ -205,7 +205,7 @@ def create_subnets(ec2_connection, vpc_connection, vpc, cidr_block):
                                                                   'Project': core.PROJECT_NAME.lower(),
                                                                   'Environment': core.args.environment.lower()})
             except boto.exception.EC2ResponseError as error:
-                if error.code == 'InvalidID': # Subnet hasn't registered with Virtual Private Cloud (VPC) service yet.
+                if error.code == 'InvalidSubnetID.NotFound': # Subnet hasn't registered with Virtual Private Cloud (VPC) service yet.
                     pass
                 else:
                     raise boto.exception.EC2ResponseError

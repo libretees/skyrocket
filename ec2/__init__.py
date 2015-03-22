@@ -3,6 +3,7 @@ import random
 import logging
 import boto
 import iam
+import ec2
 import core
 
 logger = logging.getLogger(__name__)
@@ -32,11 +33,18 @@ def create_security_group(vpc):
     return sg
 
 def create_elb(sg, subnets, cert_arn):
+    # Connect to the Amazon EC2 Load Balancing (Amazon ELB) service.
     logger.info('Connecting to the Amazon EC2 Load Balancing (Amazon ELB) service.')
     elb_connection = boto.connect_elb()
     logger.info('Connected to the Amazon EC2 Load Balancing (Amazon ELB) service.')
 
+    # Connect to the Amazon Elastic Compute Cloud (Amazon EC2) service.
+    ec2_connection = ec2.connect_ec2()
+
+    # Generate Elastic Load Balancer (ELB) name.
     elb_name = '-'.join(['elb', core.PROJECT_NAME.lower(), core.args.environment.lower()])
+
+    # Delete existing Elastic Load Balancer (ELB).
     logger.info('Deleting Elastic Load Balancer (%s).' % elb_name)
     try:
         elb_connection.delete_load_balancer(elb_name)
@@ -47,6 +55,7 @@ def create_elb(sg, subnets, cert_arn):
             logger.error('Elastic Load Balancer (%s) was not found. Error %s: %s.' % (elb_name, error.status, error.reason))
     logger.info('Deleted Elastic Load Balancer (%s).' % elb_name)
 
+    # Create Elastic Load Balancer (ELB).
     logger.info('Creating Elastic Load Balancer (%s).' % elb_name)
     load_balancer = elb_connection.create_load_balancer(elb_name, # name
                                                         None,     # zones         - Valid only for load balancers in EC2-Classic.
@@ -57,6 +66,7 @@ def create_elb(sg, subnets, cert_arn):
                                                         scheme='internet-facing', # Valid only for load balancers in EC2-VPC.
                                                         complex_listeners=None)
     logger.info('Created Elastic Load Balancer (%s).' % elb_name)
+
     return load_balancer
 
 def create_ec2_instances(security_groups, subnets, script, instance_profile_name):
@@ -109,7 +119,15 @@ def create_ec2_instance(security_groups, subnet, script, instance_profile_name):
                 raise boto.exception.EC2ResponseError
 
     # Get Elastic Network Interface (ENI) attached to instance.
-    interfaces = ec2_connection.get_all_network_interfaces(filters={'attachment.instance-id': instance.id})
+    interfaces = None
+    while not interfaces:
+        try:
+            interfaces = ec2_connection.get_all_network_interfaces(filters={'attachment.instance-id': instance.id})
+        except boto.exception.EC2ResponseError as error:
+            if error.code == 'InvalidInstanceID.NotFound': # Instance hasn't registered with EC2 service yet.
+                pass
+            else:
+                raise boto.exception.EC2ResponseError
 
     # Tag Elastic Network Interface (ENI).
     tagged = False
@@ -119,8 +137,7 @@ def create_ec2_instance(security_groups, subnet, script, instance_profile_name):
                                                                                              'Project': core.PROJECT_NAME.lower(),
                                                                                              'Environment': core.args.environment.lower()})
         except boto.exception.EC2ResponseError as error:
-            if error.code == 'InvalidNetworkInterfaceID.NotFound' or \
-               error.code == 'InvalidInstanceID.NotFound':             # ENI hasn't registered with EC2 service yet.
+            if error.code == 'InvalidNetworkInterfaceID.NotFound': # ENI hasn't registered with EC2 service yet.
                 pass
             else:
                 raise boto.exception.EC2ResponseError
