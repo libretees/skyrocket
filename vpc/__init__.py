@@ -57,6 +57,7 @@ def create_public_vpc(vpc_connection, cidr_block):
     # Connect to the Amazon Elastic Compute Cloud (Amazon EC2) service.
     ec2_connection = ec2.connect_ec2()
 
+    # Generate Virtual Private Cloud (VPC) name.
     vpc_name = '-'.join(['vpc', core.PROJECT_NAME.lower(), core.args.environment.lower()])
     new_vpc = None
     try:
@@ -66,7 +67,7 @@ def create_public_vpc(vpc_connection, cidr_block):
                                             dry_run=False)
         logger.info('Created Virtual Private Cloud (VPC) (%s).' % vpc_name)
 
-        # Tag VPC.
+        # Tag Virtual Private Cloud (VPC).
         tagged = False
         while not tagged:
             try:
@@ -88,8 +89,19 @@ def create_public_vpc(vpc_connection, cidr_block):
         logger.info('Creating Internet Gateway (%s).' % igw_name)
         igw = vpc_connection.create_internet_gateway(dry_run=False)
         logger.info('Created Internet Gateway (%s).' % igw_name)
-        time.sleep(1) # required 1-second sleep
-        igw.add_tag('Name', igw_name)
+
+        # Tag Internet Gateway.
+        tagged = False
+        while not tagged:
+            try:
+                tagged = ec2_connection.create_tags([igw.id], {'Name': vpc_name,
+                                                               'Project': core.PROJECT_NAME.lower(),
+                                                               'Environment': core.args.environment.lower()})
+            except boto.exception.EC2ResponseError as error:
+                if error.code == 'InvalidID': # IGW hasn't registered with Virtual Private Cloud (VPC) service yet.
+                    pass
+                else:
+                    raise boto.exception.EC2ResponseError
 
         logger.info('Attaching Internet Gateway (%s) to VPC (%s).' % (igw_name, vpc_name))
         vpc_connection.attach_internet_gateway(igw.id,     # internet_gateway_id
@@ -97,15 +109,48 @@ def create_public_vpc(vpc_connection, cidr_block):
                                                dry_run=False)
         logger.info('Attached Internet Gateway (%s).' % igw_name)
 
-        acl_name = '-'.join(['acl', core.PROJECT_NAME.lower(), core.args.environment.lower()])
-        acl = vpc_connection.get_all_network_acls(filters={'vpc_id': new_vpc.id})[0]
-        acl.add_tag('Name', acl_name)
+        # Get Access Control Lists (ACLs) associated to VPC.
+        acls = vpc_connection.get_all_network_acls(filters={'vpc_id': new_vpc.id})
 
+        # Generate Access Control List (ACL) name.
+        acl_name = '-'.join(['acl', core.PROJECT_NAME.lower(), core.args.environment.lower()])
+
+        # Tag Access Control Lists (ACLs).
+        for acl in acls:
+            tagged = False
+            while not tagged:
+                try:
+                    tagged = ec2_connection.create_tags([acl.id], {'Name': acl_name,
+                                                                   'Project': core.PROJECT_NAME.lower(),
+                                                                   'Environment': core.args.environment.lower()})
+                except boto.exception.EC2ResponseError as error:
+                    if error.code == 'InvalidNetworkAclID.NotFound': # ACL hasn't registered with Virtual Private Cloud (VPC) service yet.
+                        pass
+                    else:
+                        raise boto.exception.EC2ResponseError
+
+        # Get Route Tables associated to VPC.
+        route_tables = vpc_connection.get_all_route_tables(filters={'vpc_id': new_vpc.id})
+
+        # Generate Route Table name.
         rtb_name = '-'.join(['rtb', core.PROJECT_NAME.lower(), core.args.environment.lower()])
-        rtb = vpc_connection.get_all_route_tables(filters={'vpc_id': new_vpc.id})[0]
-        rtb.add_tag('Name', rtb_name)
-        vpc_connection.create_route(rtb.id,         # route_table_id
-                                    '0.0.0.0/0',    # destination_cidr_block
+
+        # Tag Route Tables.
+        for route_table in route_tables:
+            tagged = False
+            while not tagged:
+                try:
+                    tagged = ec2_connection.create_tags([route_table.id], {'Name': rtb_name,
+                                                                           'Project': core.PROJECT_NAME.lower(),
+                                                                           'Environment': core.args.environment.lower()})
+                except boto.exception.EC2ResponseError as error:
+                    if error.code == 'InvalidID': # Route Table hasn't registered with Virtual Private Cloud (VPC) service yet.
+                        pass
+                    else:
+                        raise boto.exception.EC2ResponseError
+
+        vpc_connection.create_route(route_table.id,    # route_table_id
+                                    '0.0.0.0/0',       # destination_cidr_block
                                     gateway_id=igw.id,
                                     instance_id=None,
                                     interface_id=None,
@@ -114,6 +159,9 @@ def create_public_vpc(vpc_connection, cidr_block):
     return new_vpc
 
 def create_subnets(ec2_connection, vpc_connection, vpc, cidr_block):
+    # Connect to the Amazon Elastic Compute Cloud (Amazon EC2) service.
+    ec2_connection = ec2.connect_ec2()
+
     network_ip, netmask = itemgetter(0, 1)(cidr_block.split('/'))
     network_ip = int(ipaddress.IPv4Address(network_ip))
     netmask = int(netmask)
@@ -138,15 +186,29 @@ def create_subnets(ec2_connection, vpc_connection, vpc, cidr_block):
                                                                                         # for IP networking purposes.
                                                                                         # .0 for the network, .1 for the gateway,
                                                                                         # .3 for DHCP services, and .255 for broadcast.
+        # Create Subnet.
         try:
-            logger.info('Creating subnet (%s) with %s available IP addresses.' % (subnet_name, '{:,}'.format(available_ips)))
+            logger.info('Creating Subnet (%s) with %s available IP addresses.' % (subnet_name, '{:,}'.format(available_ips)))
             subnet = vpc_connection.create_subnet(vpc.id,                      # vpc_id
                                                   subnet_cidr_block,           # cidr_block
                                                   availability_zone=zone.name,
                                                   dry_run=False)
         except boto.exception.BotoServerError as error:
             if error.status == 400: # Bad Request
-                logger.error('Error %s: %s. Couldn\'t create subnet (%s).' % (error.status, error.reason, subnet_name))
+                logger.error('Error %s: %s. Couldn\'t create Subnet (%s).' % (error.status, error.reason, subnet_name))
+
+        # Tag Subnet.
+        tagged = False
+        while not tagged:
+            try:
+                tagged = ec2_connection.create_tags([subnet.id], {'Name': subnet_name,
+                                                                  'Project': core.PROJECT_NAME.lower(),
+                                                                  'Environment': core.args.environment.lower()})
+            except boto.exception.EC2ResponseError as error:
+                if error.code == 'InvalidID': # Subnet hasn't registered with Virtual Private Cloud (VPC) service yet.
+                    pass
+                else:
+                    raise boto.exception.EC2ResponseError
 
         time.sleep(1) # required 1-second sleep
         subnet.add_tag('Name', subnet_name)
