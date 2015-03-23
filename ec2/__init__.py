@@ -69,14 +69,22 @@ def create_elb(sg, subnets, cert_arn):
 
     return load_balancer
 
-def create_ec2_instances(security_groups, subnets, script, instance_profile_name):
+def create_ec2_instances(security_groups, subnets, script, instance_profile_name, os='ubuntu'):
     instances = list()
     for subnet in subnets:
-        instance = create_ec2_instance(security_groups, subnet, script, instance_profile_name)
+        instance = create_ec2_instance(security_groups, subnet, script, instance_profile_name, os)
         instances.append(instance)
     return instances
 
-def create_ec2_instance(security_groups, subnet, script, instance_profile_name):
+def create_ec2_instance(security_groups, subnet, script, instance_profile_name, os='ubuntu'):
+    # Set up dictionary of OSes and their associated Amazon Machine Images (AMIs).
+    ami = {
+        'amazon-linux': 'ami-146e2a7c',
+        'redhat':       'ami-12663b7a',
+        'suse':         'ami-aeb532c6',
+        'ubuntu':       'ami-9a562df2',
+    }
+
     # Connect to the Amazon Elastic Compute Cloud (Amazon EC2) service.
     ec2_connection = connect_ec2()
 
@@ -95,7 +103,7 @@ def create_ec2_instance(security_groups, subnet, script, instance_profile_name):
     # Create EC2 Instance.
     ec2_instance_name = '-'.join(['ec2', core.PROJECT_NAME.lower(), core.args.environment.lower(), random_id])
     logger.info('Creating EC2 Instance (%s) in %s.' % (ec2_instance_name, subnet.availability_zone))
-    reservation = ec2_connection.run_instances('ami-9a562df2',
+    reservation = ec2_connection.run_instances(ami[os],                  # image_id
                                                instance_type='t2.micro',
                                                instance_profile_name=instance_profile_name,
                                                network_interfaces=interfaces,
