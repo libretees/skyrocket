@@ -98,7 +98,7 @@ def create_public_vpc(vpc_connection, cidr_block):
                                                                'Project': core.PROJECT_NAME.lower(),
                                                                'Environment': core.args.environment.lower()})
             except boto.exception.EC2ResponseError as error:
-                if error.code == 'InvalidID': # IGW hasn't registered with Virtual Private Cloud (VPC) service yet.
+                if error.code == 'InvalidInternetGatewayID.NotFound': # IGW hasn't registered with Virtual Private Cloud (VPC) service yet.
                     pass
                 else:
                     raise boto.exception.EC2ResponseError
