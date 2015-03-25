@@ -59,6 +59,8 @@ def create_public_vpc(vpc_connection, cidr_block):
 
     # Generate Virtual Private Cloud (VPC) name.
     vpc_name = '-'.join(['vpc', core.PROJECT_NAME.lower(), core.args.environment.lower()])
+
+    # Create Virtual Private Cloud (VPC).
     new_vpc = None
     try:
         logger.info('Creating Virtual Private Cloud (VPC) (%s) with CIDR block (%s).' % (vpc_name, cidr_block))
@@ -66,26 +68,28 @@ def create_public_vpc(vpc_connection, cidr_block):
                                             instance_tenancy='default',
                                             dry_run=False)
         logger.info('Created Virtual Private Cloud (VPC) (%s).' % vpc_name)
-
-        # Tag Virtual Private Cloud (VPC).
-        tagged = False
-        while not tagged:
-            try:
-                tagged = ec2_connection.create_tags([new_vpc.id], {'Name': vpc_name,
-                                                                   'Project': core.PROJECT_NAME.lower(),
-                                                                   'Environment': core.args.environment.lower()})
-            except boto.exception.EC2ResponseError as error:
-                if error.code == 'InvalidVpcID.NotFound': # VPC hasn't registered with Virtual Private Cloud (VPC) service yet.
-                    pass
-                else:
-                    raise boto.exception.EC2ResponseError
-
     except boto.exception.EC2ResponseError as error:
         if error.status == 400: # Bad Request
             logger.error('Error %s: %s. Could not create VPC (%s). %s' % (error.status, error.reason, vpc_name, error.message))
 
+    # Tag Virtual Private Cloud (VPC).
+    tagged = False
+    while new_vpc and not tagged:
+        try:
+            tagged = ec2_connection.create_tags([new_vpc.id], {'Name': vpc_name,
+                                                               'Project': core.PROJECT_NAME.lower(),
+                                                               'Environment': core.args.environment.lower()})
+        except boto.exception.EC2ResponseError as error:
+            if error.code == 'InvalidVpcID.NotFound': # VPC hasn't registered with Virtual Private Cloud (VPC) service yet.
+                pass
+            else:
+                raise boto.exception.EC2ResponseError
+
     if new_vpc:
+        # Generate Internet Gateway name.
         igw_name = '-'.join(['igw', core.PROJECT_NAME.lower(), core.args.environment.lower()])
+
+        # Create Internet Gateway.
         logger.info('Creating Internet Gateway (%s).' % igw_name)
         igw = vpc_connection.create_internet_gateway(dry_run=False)
         logger.info('Created Internet Gateway (%s).' % igw_name)
@@ -103,13 +107,14 @@ def create_public_vpc(vpc_connection, cidr_block):
                 else:
                     raise boto.exception.EC2ResponseError
 
+        # Attach Internet Gateway to Virtual Private Cloud (VPC).
         logger.info('Attaching Internet Gateway (%s) to VPC (%s).' % (igw_name, vpc_name))
         vpc_connection.attach_internet_gateway(igw.id,     # internet_gateway_id
                                                new_vpc.id, # vpc_id
                                                dry_run=False)
         logger.info('Attached Internet Gateway (%s).' % igw_name)
 
-        # Get Access Control Lists (ACLs) associated to VPC.
+        # Get Access Control Lists (ACLs) associated to Virtual Private Cloud (VPC).
         acls = vpc_connection.get_all_network_acls(filters={'vpc_id': new_vpc.id})
 
         # Generate Access Control List (ACL) name.
@@ -149,6 +154,7 @@ def create_public_vpc(vpc_connection, cidr_block):
                     else:
                         raise boto.exception.EC2ResponseError
 
+        # Add route to Internet to Route Table.
         vpc_connection.create_route(route_table.id,    # route_table_id
                                     '0.0.0.0/0',       # destination_cidr_block
                                     gateway_id=igw.id,
@@ -178,7 +184,7 @@ def create_subnets(ec2_connection, vpc_connection, vpc, cidr_block):
         # Generate Subnet name.
         subnet_name = '-'.join(['subnet', core.PROJECT_NAME.lower(), core.args.environment.lower(), zone.name])
 
-        # Calculate Subnet CIDR block.
+        # Create Subnet CIDR block.
         subnet_network_ip = (network_ip | (i << 32-subnet_netmask))
         subnet_cidr_block = str(subnet_network_ip >> 24) + '.' + \
                             str((subnet_network_ip >> 16) & 255) + '.' + \
@@ -216,10 +222,10 @@ def create_subnets(ec2_connection, vpc_connection, vpc, cidr_block):
 
     return subnets
 
-def get_network_capacity(subnet_netmask):
+def get_network_capacity(netmask):
     # Calculate the number of available IP addresses on a given network.
-    available_ips = (0xffffffff ^ (0xffffffff << 32-subnet_netmask & 0xffffffff))-4 # 4 addresses are reserved by Amazon
-                                                                                    # for IP networking purposes.
-                                                                                    # .0 for the network, .1 for the gateway,
-                                                                                    # .3 for DHCP services, and .255 for broadcast.
+    available_ips = (0xffffffff ^ (0xffffffff << 32-netmask & 0xffffffff))-4 # 4 addresses are reserved by Amazon
+                                                                             # for IP networking purposes.
+                                                                             # .0 for the network, .1 for the gateway,
+                                                                             # .3 for DHCP services, and .255 for broadcast.
     return available_ips
