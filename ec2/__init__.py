@@ -72,8 +72,8 @@ def create_elb(sg, subnets, cert_arn):
 def create_ec2_instances(security_groups, subnets, script, instance_profile_name, os='ubuntu', image_id=None):
     instances = list()
     for subnet in subnets:
-        instance = create_ec2_instance(security_groups, subnet, script, instance_profile_name, os, image_id)
-        instances.append(instance)
+        created_instances = create_ec2_instance(security_groups, subnet, script, instance_profile_name, os, image_id)
+        instances = instances + created_instances
     return instances
 
 def create_ec2_instance(security_groups, subnet, script, instance_profile_name, os='ubuntu', image_id=None):
@@ -112,10 +112,10 @@ def create_ec2_instance(security_groups, subnet, script, instance_profile_name, 
     ec2_instance_name = '-'.join(['ec2', core.PROJECT_NAME.lower(), core.args.environment.lower(), random_id])
     logger.info('Creating EC2 Instance (%s) in %s.' % (ec2_instance_name, subnet.availability_zone))
     reservation = ec2_connection.run_instances(image_id,                 # image_id
-                                                instance_type='t2.micro',
-                                                instance_profile_name=instance_profile_name,
-                                                network_interfaces=interfaces,
-                                                user_data=script)
+                                               instance_type='t2.micro',
+                                               instance_profile_name=instance_profile_name,
+                                               network_interfaces=interfaces,
+                                               user_data=script)
     logger.info('Created EC2 Instance (%s).' % ec2_instance_name)
 
     # Get EC2 Instances.
@@ -138,7 +138,7 @@ def create_ec2_instance(security_groups, subnet, script, instance_profile_name, 
     interfaces = None
     while not interfaces:
         try:
-            interfaces = ec2_connection.get_all_network_interfaces(filters={'attachment.instance-id': instance.id})
+            interfaces = ec2_connection.get_all_network_interfaces(filters={'attachment.instance-id': [instance.id for instance in instances]})
         except boto.exception.EC2ResponseError as error:
             if error.code == 'InvalidInstanceID.NotFound': # Instance hasn't registered with EC2 service yet.
                 pass
