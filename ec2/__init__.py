@@ -69,15 +69,15 @@ def create_elb(sg, subnets, cert_arn):
 
     return load_balancer
 
-def create_ec2_instances(security_groups, subnets, script, instance_profile_name, os='ubuntu'):
+def create_ec2_instances(security_groups, subnets, script, instance_profile_name, os='ubuntu', image_id=None):
     instances = list()
     for subnet in subnets:
-        instance = create_ec2_instance(security_groups, subnet, script, instance_profile_name, os)
+        instance = create_ec2_instance(security_groups, subnet, script, instance_profile_name, os, image_id)
         instances.append(instance)
     return instances
 
-def create_ec2_instance(security_groups, subnet, script, instance_profile_name, os='ubuntu'):
-    # Set up dictionary of OSes and their associated Amazon Machine Images (AMIs).
+def create_ec2_instance(security_groups, subnet, script, instance_profile_name, os='ubuntu', image_id=None):
+    # Set up dictionary of OSes and their associated quick-start Amazon Machine Images (AMIs).
     ami = {
         'amazon-linux': 'ami-146e2a7c',
         'redhat':       'ami-12663b7a',
@@ -87,6 +87,14 @@ def create_ec2_instance(security_groups, subnet, script, instance_profile_name, 
 
     # Connect to the Amazon Elastic Compute Cloud (Amazon EC2) service.
     ec2_connection = connect_ec2()
+
+    # Determine whether to use a start-up AMI or a specific AMI.
+    if image_id:
+        image = ec2_connection.get_image(image_id)
+        if not image:
+            raise RuntimeError('The specified Amazon Machine Image (AMI) could not be found (%s).' % image_id)
+    else:
+        image_id = ami[os]
 
     # Generate random identifier.
     random_id = '{:08x}'.format(random.randrange(2**32))
@@ -100,33 +108,33 @@ def create_ec2_instance(security_groups, subnet, script, instance_profile_name, 
                                                                         associate_public_ip_address=True)
     interfaces = boto.ec2.networkinterface.NetworkInterfaceCollection(interface)
 
-    # Create EC2 Instance.
+    # Create EC2 Reservation.
     ec2_instance_name = '-'.join(['ec2', core.PROJECT_NAME.lower(), core.args.environment.lower(), random_id])
     logger.info('Creating EC2 Instance (%s) in %s.' % (ec2_instance_name, subnet.availability_zone))
-    reservation = ec2_connection.run_instances(ami[os],                  # image_id
-                                               instance_type='t2.micro',
-                                               instance_profile_name=instance_profile_name,
-                                               network_interfaces=interfaces,
-                                               user_data=script)
+    reservation = ec2_connection.run_instances(image_id,                 # image_id
+                                                instance_type='t2.micro',
+                                                instance_profile_name=instance_profile_name,
+                                                network_interfaces=interfaces,
+                                                user_data=script)
     logger.info('Created EC2 Instance (%s).' % ec2_instance_name)
 
-    # Get EC2 Instance.
-    instance = reservation.instances[-1]
+    # Get EC2 Instances.
+    instances = [instances for instances in reservation.instances]
 
-    # Tag EC2 Instance.
+    # Tag EC2 Instances.
     tagged = False
     while not tagged:
         try:
-            tagged = ec2_connection.create_tags([instance.id], {'Name': ec2_instance_name,
-                                                                'Project': core.PROJECT_NAME.lower(),
-                                                                'Environment': core.args.environment.lower()})
+            tagged = ec2_connection.create_tags([instance.id for instance in instances], {'Name': ec2_instance_name,
+                                                                                          'Project': core.PROJECT_NAME.lower(),
+                                                                                          'Environment': core.args.environment.lower()})
         except boto.exception.EC2ResponseError as error:
             if error.code == 'InvalidInstanceID.NotFound': # Instance hasn't registered with EC2 service yet.
                 pass
             else:
                 raise boto.exception.EC2ResponseError
 
-    # Get Elastic Network Interface (ENI) attached to instance.
+    # Get Elastic Network Interface (ENI) attached to instances.
     interfaces = None
     while not interfaces:
         try:
@@ -150,4 +158,4 @@ def create_ec2_instance(security_groups, subnet, script, instance_profile_name, 
             else:
                 raise boto.exception.EC2ResponseError
 
-    return instance
+    return instances
