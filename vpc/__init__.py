@@ -162,6 +162,7 @@ def create_subnets(ec2_connection, vpc_connection, vpc, cidr_block):
     # Connect to the Amazon Elastic Compute Cloud (Amazon EC2) service.
     ec2_connection = ec2.connect_ec2()
 
+    # Break CIDR block into IP and Netmask components.
     network_ip, netmask = itemgetter(0, 1)(cidr_block.split('/'))
     network_ip = int(ipaddress.IPv4Address(network_ip))
     netmask = int(netmask)
@@ -174,25 +175,25 @@ def create_subnets(ec2_connection, vpc_connection, vpc, cidr_block):
 
     subnets = list()
     for i, zone in enumerate(zones):
+        # Generate Subnet name.
         subnet_name = '-'.join(['subnet', core.PROJECT_NAME.lower(), core.args.environment.lower(), zone.name])
 
+        # Calculate Subnet CIDR block.
         subnet_network_ip = (network_ip | (i << 32-subnet_netmask))
         subnet_cidr_block = str(subnet_network_ip >> 24) + '.' + \
                             str((subnet_network_ip >> 16) & 255) + '.' + \
                             str((subnet_network_ip >> 8) & 255) + '.' + \
                             str(subnet_network_ip & 255) + '/' + \
                             str(subnet_netmask)
-        available_ips = (0xffffffff ^ (0xffffffff << 32-subnet_netmask & 0xffffffff))-4 # 4 addresses are reserved by Amazon
-                                                                                        # for IP networking purposes.
-                                                                                        # .0 for the network, .1 for the gateway,
-                                                                                        # .3 for DHCP services, and .255 for broadcast.
+
         # Create Subnet.
         try:
-            logger.info('Creating Subnet (%s) with %s available IP addresses.' % (subnet_name, '{:,}'.format(available_ips)))
+            logger.info('Creating Subnet (%s) with %s available IP addresses.' % (subnet_name, '{:,}'.format(get_network_capacity(subnet_netmask))))
             subnet = vpc_connection.create_subnet(vpc.id,                      # vpc_id
                                                   subnet_cidr_block,           # cidr_block
                                                   availability_zone=zone.name,
                                                   dry_run=False)
+            logger.info('Created subnet (%s).' % subnet_name)
         except boto.exception.BotoServerError as error:
             if error.status == 400: # Bad Request
                 logger.error('Error %s: %s. Couldn\'t create Subnet (%s).' % (error.status, error.reason, subnet_name))
@@ -210,9 +211,15 @@ def create_subnets(ec2_connection, vpc_connection, vpc, cidr_block):
                 else:
                     raise boto.exception.EC2ResponseError
 
-        time.sleep(1) # required 1-second sleep
-        subnet.add_tag('Name', subnet_name)
+        # Add Subnet to list.
         subnets.append(subnet)
-        logger.info('Created subnet (%s).' % subnet_name)
 
     return subnets
+
+def get_network_capacity(subnet_netmask):
+    # Calculate the number of available IP addresses on a given network.
+    available_ips = (0xffffffff ^ (0xffffffff << 32-subnet_netmask & 0xffffffff))-4 # 4 addresses are reserved by Amazon
+                                                                                    # for IP networking purposes.
+                                                                                    # .0 for the network, .1 for the gateway,
+                                                                                    # .3 for DHCP services, and .255 for broadcast.
+    return available_ips
