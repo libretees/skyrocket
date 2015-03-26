@@ -72,31 +72,29 @@ def create_public_vpc(vpc_connection, cidr_block):
         if error.status == 400: # Bad Request
             logger.error('Error %s: %s. Could not create VPC (%s). %s' % (error.status, error.reason, vpc_name, error.message))
 
-    # Tag Virtual Private Cloud (VPC).
-    tagged = False
-    while new_vpc and not tagged:
-        try:
-            tagged = ec2_connection.create_tags([new_vpc.id], {'Name': vpc_name,
-                                                               'Project': core.PROJECT_NAME.lower(),
-                                                               'Environment': core.args.environment.lower()})
-        except boto.exception.EC2ResponseError as error:
-            if error.code == 'InvalidVpcID.NotFound': # VPC hasn't registered with Virtual Private Cloud (VPC) service yet.
-                pass
-            else:
-                raise boto.exception.EC2ResponseError
-
+    # Configure Virtual Private Cloud (VPC).
     if new_vpc:
-        # Generate Internet Gateway name.
-        igw_name = '-'.join(['igw', core.PROJECT_NAME.lower(), core.args.environment.lower()])
+        # Tag Virtual Private Cloud (VPC).
+        tagged = False
+        while not tagged:
+            try:
+                tagged = ec2_connection.create_tags([new_vpc.id], {'Name': vpc_name,
+                                                                   'Project': core.PROJECT_NAME.lower(),
+                                                                   'Environment': core.args.environment.lower()})
+            except boto.exception.EC2ResponseError as error:
+                if error.code == 'InvalidVpcID.NotFound': # VPC hasn't registered with Virtual Private Cloud (VPC) service yet.
+                    pass
+                else:
+                    raise boto.exception.EC2ResponseError
 
         # Create Internet Gateway.
-        logger.info('Creating Internet Gateway (%s).' % igw_name)
         igw = vpc_connection.create_internet_gateway(dry_run=False)
-        logger.info('Created Internet Gateway (%s).' % igw_name)
 
         # Tag Internet Gateway.
         tagged = False
         while not tagged:
+            # Generate Internet Gateway name.
+            igw_name = '-'.join(['igw', core.PROJECT_NAME.lower(), core.args.environment.lower()])
             try:
                 tagged = ec2_connection.create_tags([igw.id], {'Name': vpc_name,
                                                                'Project': core.PROJECT_NAME.lower(),
@@ -117,11 +115,12 @@ def create_public_vpc(vpc_connection, cidr_block):
         # Get Access Control Lists (ACLs) associated to Virtual Private Cloud (VPC).
         acls = vpc_connection.get_all_network_acls(filters={'vpc_id': new_vpc.id})
 
-        # Generate Access Control List (ACL) name.
-        acl_name = '-'.join(['acl', core.PROJECT_NAME.lower(), core.args.environment.lower()])
-
-        # Tag Access Control Lists (ACLs).
+        # Configure Access Control Lists (ACL).
         for acl in acls:
+            # Generate Access Control List (ACL) name.
+            acl_name = '-'.join(['acl', core.PROJECT_NAME.lower(), core.args.environment.lower()])
+            
+            # Tag Access Control Lists (ACLs).
             tagged = False
             while not tagged:
                 try:
@@ -137,11 +136,12 @@ def create_public_vpc(vpc_connection, cidr_block):
         # Get Route Tables associated to VPC.
         route_tables = vpc_connection.get_all_route_tables(filters={'vpc_id': new_vpc.id})
 
-        # Generate Route Table name.
-        rtb_name = '-'.join(['rtb', core.PROJECT_NAME.lower(), core.args.environment.lower()])
-
-        # Tag Route Tables.
+        # Configure default Route Tables.
         for route_table in route_tables:
+            # Generate Route Table name.
+            rtb_name = '-'.join(['rtb', core.PROJECT_NAME.lower(), core.args.environment.lower()])
+            
+            # Tag Route Tables.
             tagged = False
             while not tagged:
                 try:
@@ -154,14 +154,14 @@ def create_public_vpc(vpc_connection, cidr_block):
                     else:
                         raise boto.exception.EC2ResponseError
 
-        # Add route to Internet to Route Table.
-        vpc_connection.create_route(route_table.id,    # route_table_id
-                                    '0.0.0.0/0',       # destination_cidr_block
-                                    gateway_id=igw.id,
-                                    instance_id=None,
-                                    interface_id=None,
-                                    vpc_peering_connection_id=None,
-                                    dry_run=False)
+            # Add route to Internet to default Route Table.
+            vpc_connection.create_route(route_table.id,    # route_table_id
+                                        '0.0.0.0/0',       # destination_cidr_block
+                                        gateway_id=igw.id,
+                                        instance_id=None,
+                                        interface_id=None,
+                                        vpc_peering_connection_id=None,
+                                        dry_run=False)
     return new_vpc
 
 def create_subnets(ec2_connection, vpc_connection, vpc, cidr_block):
