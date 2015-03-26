@@ -69,14 +69,14 @@ def create_elb(sg, subnets, cert_arn):
 
     return load_balancer
 
-def create_ec2_instances(security_groups, subnets, script, instance_profile_name, os='ubuntu', image_id=None):
+def create_ec2_instances(security_groups, subnets, script=None, instance_profile_name=None, os='ubuntu', image_id=None):
     instances = list()
     for subnet in subnets:
         created_instances = create_ec2_instance(security_groups, subnet, script, instance_profile_name, os, image_id)
         instances = instances + created_instances
     return instances
 
-def create_ec2_instance(security_groups, subnet, script, instance_profile_name, os='ubuntu', image_id=None):
+def create_ec2_instance(security_groups, subnet, script=None, instance_profile_name=None, os='ubuntu', image_id=None):
     # Set up dictionary of OSes and their associated quick-start Amazon Machine Images (AMIs).
     ami = {
         'amazon-linux': 'ami-146e2a7c',
@@ -159,3 +159,11 @@ def create_ec2_instance(security_groups, subnet, script, instance_profile_name, 
                 raise boto.exception.EC2ResponseError
 
     return instances
+
+def run(script, command):
+    script += '\n' + command
+    return script
+
+def install_package(script, package_name):
+    script += '\n' + 'apt-get --yes --quiet install %s' % package_name
+    return script

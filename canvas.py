@@ -63,6 +63,10 @@ def main():
     load_balancer = ec2.create_elb(sg, subnets, cert_arn)
 
     script = get_script('us-east-1', bucket.name, archive_name, bootstrap_archive_name)
+    script = ec2.install_package(script, 'python3-pip')
+    script = ec2.run(script, 'pip3 install virtualenv')
+    script = ec2.run(script, 'pip3 install virtualenvwrapper')
+
     instance_profile_name = iam.create_role([policy])
 
     instances = ec2.create_ec2_instances([sg], subnets, script, instance_profile_name)
@@ -77,7 +81,7 @@ def main():
     instances = [instances for reservation in reservations for instances in reservation.instances]
 
     # Terminate EC2 instances.
-    # ec2_connection.terminate_instances(instance_ids=[instance.id for instance in instances])
+    ec2_connection.terminate_instances(instance_ids=[instance.id for instance in instances])
 
     # curl http://169.254.169.254/latest/meta-data/iam/security-credentials/myrole
     # aws s3 cp --region us-east-1 s3://s3-gossamer-staging-faddde2b/gossamer.tar.gz gossamer.tar.gz
