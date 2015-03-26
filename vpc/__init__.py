@@ -229,3 +229,15 @@ def get_network_capacity(netmask):
                                                                              # .0 for the network, .1 for the gateway,
                                                                              # .3 for DHCP services, and .255 for broadcast.
     return available_ips
+
+def get_default_vpc():
+    # Connect to the Amazon Virtual Private Cloud (Amazon VPC) service.
+    vpc_connection = connect_vpc()
+
+    # Get all Virtual Private Clouds (VPCs).
+    vpcs = vpc_connection.get_all_vpcs()
+
+    # Get default VPC.
+    default_vpc = [vpc for vpc in vpcs if vpc.is_default]
+
+    return default_vpc[0] if len(default_vpc) else None
