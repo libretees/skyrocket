@@ -164,7 +164,7 @@ def create_public_vpc(vpc_connection, cidr_block):
                                         dry_run=False)
     return new_vpc
 
-def create_subnets(vpc):
+def create_subnets(vpc, align_cidr=True):
     # Connect to the Amazon Elastic Compute Cloud (Amazon EC2) service.
     ec2_connection = ec2.connect_ec2()
 
@@ -176,6 +176,10 @@ def create_subnets(vpc):
     # Calculate Subnet netmask.
     zones = ec2_connection.get_all_zones()
     subnet_netmask = netmask+len(bin(len(zones)))-2
+
+    if align_cidr:
+        # Align CIDR block to nearest byte.
+        subnet_netmask = subnet_netmask+8-(subnet_netmask%8)
 
     if subnet_netmask > 28:
         logger.warning('The CIDR block specified will not support the creation of subnets in all availability zones.' % vpc.cidr_block)
