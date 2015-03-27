@@ -165,7 +165,7 @@ def create_vpc(vpc_connection, cidr_block):
                                         dry_run=False)
     return new_vpc
 
-def create_subnets(vpc, zones='All', count=1, align_cidr=True):
+def create_subnets(vpc, zones='All', count=1, byte_aligned=False, balanced=False):
     # Connect to the Amazon Virtual Private Cloud (Amazon VPC) service.
     vpc_connection = connect_vpc()
 
@@ -176,7 +176,7 @@ def create_subnets(vpc, zones='All', count=1, align_cidr=True):
     network_ip, netmask = get_cidr_block_components(vpc.cidr_block)
 
     # Get/Validate Availability Zones associated with the current region.
-    if zones.lower() == 'all':
+    if isinstance(zones, str) and zones.lower() == 'all':
         zones = None
     zones = ec2_connection.get_all_zones(zones)
 
@@ -192,9 +192,13 @@ def create_subnets(vpc, zones='All', count=1, align_cidr=True):
     num_subnets = len(vpc_connection.get_all_subnets(filters={'vpc-id': vpc.id,}))
 
     # Calculate Subnet netmask.
-    subnet_netmask = netmask+len(bin(num_subnets+len(zones)*count))-2
+    subnet_netmask = netmask+len(bin(num_subnets+len(zones)*count))-3
 
-    if align_cidr:
+    if balanced:
+        # Balance between network expansion and network size.
+        subnet_netmask = subnet_netmask+(8-(subnet_netmask%8))//2 if subnet_netmask < 24 else subnet_netmask
+
+    if byte_aligned:
         # Align CIDR block to nearest byte, if possible.
         subnet_netmask = subnet_netmask+8-(subnet_netmask%8) if subnet_netmask < 24 else subnet_netmask
 
@@ -215,7 +219,7 @@ def create_subnets(vpc, zones='All', count=1, align_cidr=True):
                             str((subnet_network_ip >> 8) & 255) + '.' + \
                             str(subnet_network_ip & 255) + '/' + \
                             str(subnet_netmask)
-
+        print('CIDR', subnet_cidr_block)
         # Create Subnet.
         subnet = create_subnet(vpc, zone, subnet_cidr_block, subnet_name)
 
