@@ -9,10 +9,10 @@ DJANGO_ENGINE = core.settings.DATABASES['default']['ENGINE']
 logger = logging.getLogger(__name__)
 
 def connect_rds():
-    logger.info('Connecting to the Amazon Relational Database Service (Amazon RDS).')
+    logger.debug('Connecting to the Amazon Relational Database Service (Amazon RDS).')
     rds = boto.connect_rds2(aws_access_key_id=core.args.key_id,
                             aws_secret_access_key=core.args.key)
-    logger.info('Connected to Amazon RDS.')
+    logger.debug('Connected to Amazon RDS.')
     
     return rds
 
