@@ -10,10 +10,10 @@ import core
 logger = logging.getLogger(__name__)
 
 def connect_vpc():
-    logger.info('Connecting to the Amazon Virtual Private Cloud (Amazon VPC) service.')
+    logger.debug('Connecting to the Amazon Virtual Private Cloud (Amazon VPC) service.')
     vpc = boto.connect_vpc(aws_access_key_id=core.args.key_id,
                            aws_secret_access_key=core.args.key)
-    logger.info('Connected to Amazon VPC.')
+    logger.debug('Connected to Amazon VPC.')
     
     return vpc
 
@@ -164,21 +164,23 @@ def create_public_vpc(vpc_connection, cidr_block):
                                         dry_run=False)
     return new_vpc
 
-def create_subnets(ec2_connection, vpc_connection, vpc, cidr_block):
+def create_subnets(vpc):
     # Connect to the Amazon Elastic Compute Cloud (Amazon EC2) service.
     ec2_connection = ec2.connect_ec2()
 
     # Break CIDR block into IP and Netmask components.
-    network_ip, netmask = itemgetter(0, 1)(cidr_block.split('/'))
+    network_ip, netmask = itemgetter(0, 1)(vpc.cidr_block.split('/'))
     network_ip = int(ipaddress.IPv4Address(network_ip))
     netmask = int(netmask)
 
+    # Calculate Subnet netmask.
     zones = ec2_connection.get_all_zones()
     subnet_netmask = netmask+len(bin(len(zones)))-2
 
     if subnet_netmask > 28:
-        logger.warning('The CIDR block specified will not support the creation of subnets in all availability zones.' % cidr_block)
+        logger.warning('The CIDR block specified will not support the creation of subnets in all availability zones.' % vpc.cidr_block)
 
+    # Create Subnets.
     subnets = list()
     for i, zone in enumerate(zones):
         # Generate Subnet name.
@@ -193,41 +195,57 @@ def create_subnets(ec2_connection, vpc_connection, vpc, cidr_block):
                             str(subnet_netmask)
 
         # Create Subnet.
-        try:
-            logger.info('Creating Subnet (%s) with %s available IP addresses.' % (subnet_name, '{:,}'.format(get_network_capacity(subnet_netmask))))
-            subnet = vpc_connection.create_subnet(vpc.id,                      # vpc_id
-                                                  subnet_cidr_block,           # cidr_block
-                                                  availability_zone=zone.name,
-                                                  dry_run=False)
-            logger.info('Created subnet (%s).' % subnet_name)
-        except boto.exception.BotoServerError as error:
-            if error.status == 400: # Bad Request
-                logger.error('Error %s: %s. Couldn\'t create Subnet (%s).' % (error.status, error.reason, subnet_name))
-
-        # Tag Subnet.
-        tagged = False
-        while not tagged:
-            try:
-                tagged = ec2_connection.create_tags([subnet.id], {'Name': subnet_name,
-                                                                  'Project': core.PROJECT_NAME.lower(),
-                                                                  'Environment': core.args.environment.lower()})
-            except boto.exception.EC2ResponseError as error:
-                if error.code == 'InvalidSubnetID.NotFound': # Subnet hasn't registered with Virtual Private Cloud (VPC) service yet.
-                    pass
-                else:
-                    raise boto.exception.EC2ResponseError
+        subnet = create_subnet(vpc, zone, subnet_cidr_block, subnet_name)
 
         # Add Subnet to list.
-        subnets.append(subnet)
+        if subnet:
+            subnets.append(subnet)
 
     return subnets
 
+def create_subnet(vpc, zone, cidr_block, subnet_name=None):
+    # Connect to the Amazon Virtual Private Cloud (Amazon VPC) service.
+    vpc_connection = connect_vpc()
+
+    # Connect to the Amazon Elastic Compute Cloud (Amazon EC2) service.
+    ec2_connection = ec2.connect_ec2()
+
+    # Break CIDR block into IP and Netmask components.
+    network_ip, netmask = itemgetter(0, 1)(cidr_block.split('/'))
+
+    # Create Subnet.
+    try:
+        logger.info('Creating Subnet (%s) with %s available IP addresses.' % (subnet_name, '{:,}'.format(get_network_capacity(netmask))))
+        subnet = vpc_connection.create_subnet(vpc.id,                      # vpc_id
+                                              cidr_block,                  # cidr_block
+                                              availability_zone=zone.name,
+                                              dry_run=False)
+        logger.info('Created subnet (%s).' % subnet_name)
+    except boto.exception.BotoServerError as error:
+        if error.status == 400: # Bad Request
+            logger.error('Error %s: %s. Couldn\'t create Subnet (%s).' % (error.status, error.reason, subnet_name))
+
+    # Tag Subnet.
+    tagged = False
+    while not tagged:
+        try:
+            tagged = ec2_connection.create_tags([subnet.id], {'Name': subnet_name,
+                                                              'Project': core.PROJECT_NAME.lower(),
+                                                              'Environment': core.args.environment.lower()})
+        except boto.exception.EC2ResponseError as error:
+            if error.code == 'InvalidSubnetID.NotFound': # Subnet hasn't registered with Virtual Private Cloud (VPC) service yet.
+                pass
+            else:
+                raise boto.exception.EC2ResponseError
+
+    return subnet
+
 def get_network_capacity(netmask):
     # Calculate the number of available IP addresses on a given network.
-    available_ips = (0xffffffff ^ (0xffffffff << 32-netmask & 0xffffffff))-4 # 4 addresses are reserved by Amazon
-                                                                             # for IP networking purposes.
-                                                                             # .0 for the network, .1 for the gateway,
-                                                                             # .3 for DHCP services, and .255 for broadcast.
+    available_ips = (0xffffffff ^ (0xffffffff << 32-int(netmask) & 0xffffffff))-4 # 4 addresses are reserved by Amazon
+                                                                                  # for IP networking purposes.
+                                                                                  # .0 for the network, .1 for the gateway,
+                                                                                  # .3 for DHCP services, and .255 for broadcast.
     return available_ips
 
 def get_default_vpc():
@@ -237,7 +255,6 @@ def get_default_vpc():
     # Get all Virtual Private Clouds (VPCs).
     vpcs = vpc_connection.get_all_vpcs()
 
-    # Get default VPC.
+    # Return default VPC.
     default_vpc = [vpc for vpc in vpcs if vpc.is_default]
-
     return default_vpc[0] if len(default_vpc) else None

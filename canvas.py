@@ -41,7 +41,7 @@ def main():
         sys.exit(1)
 
     public_vpc = vpc.create_public_vpc(vpc_connection, cidr_block)
-    subnets = vpc.create_subnets(ec2_connection, vpc_connection, public_vpc, cidr_block)
+    subnets = vpc.create_subnets(public_vpc)
 
     archive_name = '.'.join([s3.PROJECT_NAME, 'tar', 'gz'])
     logger.info('Creating deployment archive (%s).' % archive_name)
