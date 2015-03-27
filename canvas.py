@@ -40,8 +40,9 @@ def main():
     if not vpc.validate_cidr_block(cidr_block):
         sys.exit(1)
 
-    public_vpc = vpc.create_vpc(vpc_connection, cidr_block)
-    public_subnets = vpc.create_subnets(public_vpc, zones=['us-east-1c'], byte_aligned=True)
+    public_vpc = vpc.create_vpc(cidr_block)
+    public_subnets = vpc.create_subnets(public_vpc, zones='all', byte_aligned=True)
+    private_subnets = vpc.create_subnets(public_vpc, zones='all', byte_aligned=True)
 
     # archive_name = '.'.join([s3.PROJECT_NAME, 'tar', 'gz'])
     # logger.info('Creating deployment archive (%s).' % archive_name)
