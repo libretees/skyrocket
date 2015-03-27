@@ -1,3 +1,4 @@
+import sys
 import time
 import re
 import ipaddress
@@ -53,7 +54,7 @@ def validate_cidr_block(cidr_block):
         logger.error('Invalid CIDR block given (%s).' % cidr_block)
         return False
 
-def create_public_vpc(vpc_connection, cidr_block):
+def create_vpc(vpc_connection, cidr_block):
     # Connect to the Amazon Elastic Compute Cloud (Amazon EC2) service.
     ec2_connection = ec2.connect_ec2()
 
@@ -164,32 +165,51 @@ def create_public_vpc(vpc_connection, cidr_block):
                                         dry_run=False)
     return new_vpc
 
-def create_subnets(vpc, align_cidr=True):
+def create_subnets(vpc, zones='All', count=1, align_cidr=True):
+    # Connect to the Amazon Virtual Private Cloud (Amazon VPC) service.
+    vpc_connection = connect_vpc()
+
     # Connect to the Amazon Elastic Compute Cloud (Amazon EC2) service.
     ec2_connection = ec2.connect_ec2()
 
     # Break CIDR block into IP and Netmask components.
     network_ip, netmask = get_cidr_block_components(vpc.cidr_block)
 
+    # Get/Validate Availability Zones associated with the current region.
+    if zones.lower() == 'all':
+        zones = None
+    zones = ec2_connection.get_all_zones(zones)
+
+    # Get the number of Subnets in each zone, so that a Subnet name can be computed.
+    for zone in zones:
+        offset = len(vpc_connection.get_all_subnets(filters={
+                                                        'vpc-id': vpc.id,
+                                                        'availability-zone': zone.name,
+                                                    }))
+        zone.offset = offset
+
+    # Get the number of Subnets within the specified VPC.
+    num_subnets = len(vpc_connection.get_all_subnets(filters={'vpc-id': vpc.id,}))
+
     # Calculate Subnet netmask.
-    zones = ec2_connection.get_all_zones()
-    subnet_netmask = netmask+len(bin(len(zones)))-2
+    subnet_netmask = netmask+len(bin(num_subnets+len(zones)*count))-2
 
     if align_cidr:
-        # Align CIDR block to nearest byte.
-        subnet_netmask = subnet_netmask+8-(subnet_netmask%8)
-
-    if subnet_netmask > 28:
-        logger.warning('The CIDR block specified will not support the creation of subnets in all availability zones.' % vpc.cidr_block)
+        # Align CIDR block to nearest byte, if possible.
+        subnet_netmask = subnet_netmask+8-(subnet_netmask%8) if subnet_netmask < 24 else subnet_netmask
 
     # Create Subnets.
     subnets = list()
-    for i, zone in enumerate(zones):
+    for i, zone in enumerate(sorted(zones*count, key=lambda zone: zone.name)):
         # Generate Subnet name.
-        subnet_name = '-'.join(['subnet', core.PROJECT_NAME.lower(), core.args.environment.lower(), zone.name])
+        suffix = '-' + str(1+zone.offset+(i%count)).zfill(len(str(zone.offset+count)))
+        subnet_name = '-'.join(['subnet', \
+                                core.PROJECT_NAME.lower(), \
+                                core.args.environment.lower(), \
+                                zone.name + suffix])
 
         # Create Subnet CIDR block.
-        subnet_network_ip = (network_ip | (i << 32-subnet_netmask))
+        subnet_network_ip = (network_ip | (num_subnets+i << 32-subnet_netmask))
         subnet_cidr_block = str(subnet_network_ip >> 24) + '.' + \
                             str((subnet_network_ip >> 16) & 255) + '.' + \
                             str((subnet_network_ip >> 8) & 255) + '.' + \
@@ -217,15 +237,20 @@ def create_subnet(vpc, zone, cidr_block, subnet_name=None):
 
     # Create Subnet.
     try:
-        logger.info('Creating Subnet (%s) with %s available IP addresses.' % (subnet_name, '{:,}'.format(get_network_capacity(netmask))))
+        logger.info('Creating Subnet (%s).' % subnet_name)
         subnet = vpc_connection.create_subnet(vpc.id,                      # vpc_id
                                               cidr_block,                  # cidr_block
                                               availability_zone=zone.name,
                                               dry_run=False)
-        logger.info('Created subnet (%s).' % subnet_name)
+        logger.info('Created Subnet (%s) with %s available IP addresses.' % (subnet_name, '{:,}'.format(get_network_capacity(netmask))))
     except boto.exception.BotoServerError as error:
         if error.status == 400: # Bad Request
             logger.error('Error %s: %s. Couldn\'t create Subnet (%s).' % (error.status, error.reason, subnet_name))
+            if error.code == 'SubnetLimitExceeded':
+                num_subnets = len(vpc_connection.get_all_subnets(filters={'vpc-id':vpc.id}))
+                logging.error('%d Subnets exist within the VPC' % num_subnets)
+                logging.error('Refer to the VPC User Guide for Amazon VPC Limits.')
+                sys.exit(1)
 
     # Tag Subnet.
     tagged = False

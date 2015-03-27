@@ -40,8 +40,9 @@ def main():
     if not vpc.validate_cidr_block(cidr_block):
         sys.exit(1)
 
-    public_vpc = vpc.create_public_vpc(vpc_connection, cidr_block)
-    subnets = vpc.create_subnets(public_vpc)
+    public_vpc = vpc.create_vpc(vpc_connection, cidr_block)
+    public_subnets = vpc.create_subnets(public_vpc, zones='all')
+    private_subnets = vpc.create_subnets(public_vpc, zones='all')
 
     archive_name = '.'.join([s3.PROJECT_NAME, 'tar', 'gz'])
     logger.info('Creating deployment archive (%s).' % archive_name)
@@ -60,7 +61,7 @@ def main():
 
     sg = ec2.create_security_group(public_vpc)
 
-    load_balancer = ec2.create_elb(sg, subnets, cert_arn)
+    load_balancer = ec2.create_elb(sg, public_subnets, cert_arn)
 
     script = get_script('us-east-1', bucket.name, archive_name, bootstrap_archive_name)
     script = ec2.install_package(script, 'python3-pip')
@@ -69,7 +70,7 @@ def main():
 
     instance_profile_name = iam.create_role([policy])
 
-    instances = ec2.create_ec2_instances([sg], subnets, script, instance_profile_name)
+    instances = ec2.create_ec2_instances([sg], public_subnets, script, instance_profile_name)
 
     logger.info('Registering EC2 Instances with Elastic Load Balancer (%s).' % load_balancer.name)
     elb_connection.register_instances(load_balancer.name, [instance.id for instance in instances])
