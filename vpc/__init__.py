@@ -14,7 +14,7 @@ def connect_vpc():
     vpc = boto.connect_vpc(aws_access_key_id=core.args.key_id,
                            aws_secret_access_key=core.args.key)
     logger.debug('Connected to Amazon VPC.')
-    
+
     return vpc
 
 def validate_cidr_block(cidr_block):
@@ -169,9 +169,7 @@ def create_subnets(vpc, align_cidr=True):
     ec2_connection = ec2.connect_ec2()
 
     # Break CIDR block into IP and Netmask components.
-    network_ip, netmask = itemgetter(0, 1)(vpc.cidr_block.split('/'))
-    network_ip = int(ipaddress.IPv4Address(network_ip))
-    netmask = int(netmask)
+    network_ip, netmask = get_cidr_block_components(vpc.cidr_block)
 
     # Calculate Subnet netmask.
     zones = ec2_connection.get_all_zones()
@@ -215,7 +213,7 @@ def create_subnet(vpc, zone, cidr_block, subnet_name=None):
     ec2_connection = ec2.connect_ec2()
 
     # Break CIDR block into IP and Netmask components.
-    network_ip, netmask = itemgetter(0, 1)(cidr_block.split('/'))
+    network_ip, netmask = get_cidr_block_components(cidr_block)
 
     # Create Subnet.
     try:
@@ -262,3 +260,11 @@ def get_default_vpc():
     # Return default VPC.
     default_vpc = [vpc for vpc in vpcs if vpc.is_default]
     return default_vpc[0] if len(default_vpc) else None
+
+def get_cidr_block_components(cidr_block):
+    # Break CIDR block into IP and Netmask components.
+    network_ip, netmask = itemgetter(0, 1)(cidr_block.split('/'))
+    network_ip = int(ipaddress.IPv4Address(network_ip))
+    netmask = int(netmask)
+
+    return (network_ip, netmask)
