@@ -41,9 +41,10 @@ def main():
         sys.exit(1)
 
     public_vpc = vpc.create_vpc(cidr_block)
-    public_subnets = vpc.create_subnets(public_vpc, zones='all', byte_aligned=True)
-    private_subnets = vpc.create_subnets(public_vpc, zones='all', byte_aligned=True)
-
+    public_subnets = vpc.create_subnets(public_vpc, zones='us-east-1b', byte_aligned=True, public=True)
+    public_subnets = vpc.create_subnets(public_vpc, zones='us-east-1b', byte_aligned=True, public=True)
+    private_subnets = vpc.create_subnets(public_vpc, zones='us-east-1b', byte_aligned=True)
+    private_subnets = vpc.create_subnets(public_vpc, zones='us-east-1b', byte_aligned=True)
     # archive_name = '.'.join([s3.PROJECT_NAME, 'tar', 'gz'])
     # logger.info('Creating deployment archive (%s).' % archive_name)
     # s3.make_tarfile(archive_name, s3.PROJECT_DIRECTORY)
