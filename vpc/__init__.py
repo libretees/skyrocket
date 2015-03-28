@@ -196,6 +196,9 @@ def create_route_table(vpc, internet_access=False):
                                     vpc_peering_connection_id=None,
                                     dry_run=False)
 
+        # Refresh Route Table.
+        route_table = vpc_connection.get_all_route_tables(route_table.id)[0]
+
     # Generate Route Table name.
     route_tables = vpc_connection.get_all_route_tables(filters={'vpc-id': vpc.id,})
     public_route_tables = vpc_connection.get_all_route_tables(filters={'vpc-id': vpc.id,
@@ -239,15 +242,14 @@ def create_subnets(vpc, zones='All', count=1, byte_aligned=False, balanced=False
     if isinstance(zones, str) and zones.lower() == 'all':
         zones = None
     elif isinstance(zones, str):
-        zones = [zone.strip() for zone in zones.split(',')]
+        zones = [zone.strip() for zone in zones.lower().split(',')]
     zones = ec2_connection.get_all_zones(zones)
 
     # Get the number of Subnets in each zone, so that a Subnet name can be computed.
     for zone in zones:
-        offset = len(vpc_connection.get_all_subnets(filters={
-                                                        'vpc-id': vpc.id,
-                                                        'availability-zone': zone.name,
-                                                    }))
+        offset = len(vpc_connection.get_all_subnets(filters={'vpc-id': vpc.id,
+                                                             'availability-zone': zone.name,
+                                                             'tag:Type': 'public' if public else 'private',}))
         zone.offset = offset
 
     # Get the number of Subnets within the specified VPC.
@@ -275,7 +277,28 @@ def create_subnets(vpc, zones='All', count=1, byte_aligned=False, balanced=False
         subnet_name = '-'.join(['subnet', \
                                 core.PROJECT_NAME.lower(), \
                                 core.args.environment.lower(), \
-                                zone.name + suffix])
+                                zone.name, \
+                                ('public' if public else 'private') + suffix])
+
+        # Shorten Subnet name, if needed and if possible.
+        shortened = dict(dict.fromkeys(['resource_type', 'environment', 'subnet_type'], False))
+        while len(subnet_name) > 37:
+            if not shortened['resource_type']:
+                subnet_name = subnet_name.replace('subnet', 'net')
+                shortened['resource_type'] = True
+                continue
+            if not shortened['subnet_type']:
+                subnet_name = subnet_name.replace('public', 'pub') if public else subnet_name.replace('private', 'priv')
+                shortened['subnet_type'] = True
+                continue
+            if not shortened['environment']:
+                if core.args.environment.lower() == 'prod':
+                    subnet_name = subnet_name.replace('prod', 'prd')
+                elif core.args.environment.lower() == 'staging':
+                    subnet_name = subnet_name.replace('staging', 'stg')
+                shortened['environment'] = True
+                continue
+            break # Give up.
 
         # Create Subnet CIDR block.
         subnet_network_ip = (network_ip | (num_subnets+i << 32-subnet_netmask))
@@ -286,16 +309,7 @@ def create_subnets(vpc, zones='All', count=1, byte_aligned=False, balanced=False
                             str(subnet_netmask)
 
         # Create Subnet.
-        subnet = create_subnet(vpc, zone, subnet_cidr_block, subnet_name)
-
-        # Associate Subnet to Route Table.
-        association = vpc_connection.associate_route_table(route_table.id, # route_table_id
-                                                           subnet.id,      # subnet_id
-                                                           dry_run=False)
-        if len(association):
-            logger.debug('Subnet (%s) associated to (%s).' % (subnet_name, route_table.name))
-        else:
-            logger.error('Subnet (%s) not associated to (%s).' % (subnet_name, route_table.name))
+        subnet = create_subnet(vpc, zone, subnet_cidr_block, subnet_name, route_table)
 
         # Add Subnet to list.
         if subnet:
@@ -303,7 +317,7 @@ def create_subnets(vpc, zones='All', count=1, byte_aligned=False, balanced=False
 
     return subnets
 
-def create_subnet(vpc, zone, cidr_block, subnet_name=None):
+def create_subnet(vpc, zone, cidr_block, subnet_name=None, route_table=None):
     # Connect to the Amazon Virtual Private Cloud (Amazon VPC) service.
     vpc_connection = connect_vpc()
 
@@ -330,13 +344,28 @@ def create_subnet(vpc, zone, cidr_block, subnet_name=None):
                 logging.error('Refer to the VPC User Guide for Amazon VPC Limits.')
                 sys.exit(1)
 
+    # Associate Subnet to Route Table.
+    public = False
+    if route_table:
+        association = vpc_connection.associate_route_table(route_table.id, # route_table_id
+                                                           subnet.id,      # subnet_id
+                                                           dry_run=False)
+        if len(association):
+            logger.debug('Subnet (%s) associated to (%s).' % (subnet_name, route_table.name))
+        else:
+            logger.error('Subnet (%s) not associated to (%s).' % (subnet_name, route_table.name))
+
+        # Determine Subnet type.
+        public = [route for route in route_table.routes if route.gateway_id and route.destination_cidr_block == '0.0.0.0/0']
+
     # Tag Subnet.
     tagged = False
     while not tagged:
         try:
             tagged = ec2_connection.create_tags([subnet.id], {'Name': subnet_name,
                                                               'Project': core.PROJECT_NAME.lower(),
-                                                              'Environment': core.args.environment.lower()})
+                                                              'Environment': core.args.environment.lower(),
+                                                              'Type': 'public' if public else 'private',})
         except boto.exception.EC2ResponseError as error:
             if error.code == 'InvalidSubnetID.NotFound': # Subnet hasn't registered with Virtual Private Cloud (VPC) service yet.
                 pass
