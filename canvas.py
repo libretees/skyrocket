@@ -29,22 +29,15 @@ def get_script(region, s3bucket, s3object, s3object2, filename='user-data.sh'):
     )
 
 def main():
-
-    vpc_connection = vpc.connect_vpc()
-    ec2_connection = ec2.connect_ec2()
-    rds_connection = rds.connect_rds()
-    elb_connection = boto.connect_elb()
-
     cidr_block = '10.0.0.0/16'
 
     if not vpc.validate_cidr_block(cidr_block):
         sys.exit(1)
 
     public_vpc = vpc.create_vpc(cidr_block)
-    public_subnets = vpc.create_subnets(public_vpc, zones='all', count=2, byte_aligned=True, public=True)
-    private_subnets = vpc.create_subnets(public_vpc, zones='all', count=2, byte_aligned=True)
-    public_subnets = vpc.create_subnets(public_vpc, zones='all', count=2, byte_aligned=True, public=True)
-    private_subnets = vpc.create_subnets(public_vpc, zones='all', count=2, byte_aligned=True)
+    public_subnets = vpc.create_subnets(public_vpc, zones='all', count=1, byte_aligned=True, public=True)
+    private_subnets = vpc.create_subnets(public_vpc, zones='all', count=1, byte_aligned=True)
+
     # archive_name = '.'.join([s3.PROJECT_NAME, 'tar', 'gz'])
     # logger.info('Creating deployment archive (%s).' % archive_name)
     # s3.make_tarfile(archive_name, s3.PROJECT_DIRECTORY)

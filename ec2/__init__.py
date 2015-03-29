@@ -160,6 +160,18 @@ def create_ec2_instance(security_groups, subnet, script=None, instance_profile_n
 
     return instances
 
+def get_nat_image(paravirtual=False):
+    # Connect to the Amazon Elastic Compute Cloud (Amazon EC2) service.
+    ec2_connection = connect_ec2()
+
+    # Get paravirtual (PV) or hardware virtual machine (HVM) Amazon Linux VPC NAT AMIs.
+    images = ec2_connection.get_all_images(filters={'owner-alias': 'amazon',
+                                                    'name': 'amzn-ami-vpc-nat-' + ('pv' if paravirtual else 'hvm') + '*',})
+
+    # Return the most recent AMI.
+    image = sorted(images, key=lambda x: x.name.split('-')[5])[-1]
+    return image
+
 def run(script, command):
     script += '\n' + command
     return script
