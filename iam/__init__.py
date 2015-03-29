@@ -93,6 +93,10 @@ def create_role(inline_policies):
     # Connect to the Amazon Identity and Access Management (Amazon IAM) service.
     iam_connection = connect_iam()
 
+    # Convert Inline Policies parameter to list, if necessary.
+    if isinstance(inline_policies, str):
+        inline_policies = [inline_policies]
+
     # Create Role.
     role_name = '-'.join(['role', core.PROJECT_NAME.lower(), core.args.environment.lower()])
     delete_role(role_name)
@@ -103,7 +107,9 @@ def create_role(inline_policies):
     # Set up Instance Profile.
     instance_profile_name = '-'.join(['role', core.PROJECT_NAME.lower(), core.args.environment.lower()])
     instance_profile = iam_connection.create_instance_profile(instance_profile_name)
+    instance_profile.name = instance_profile_name
     iam_connection.add_role_to_instance_profile(instance_profile_name, role_name)
+
 
     # Attach Inline Policies to Role.
     for inline_policy in inline_policies:
@@ -112,7 +118,7 @@ def create_role(inline_policies):
 
     # Allow time for Role to register with Amazon IAM service.
     time.sleep(5) # Required 5-second sleep.
-    return role_name
+    return instance_profile
 
 def upload_ssl_certificate():
     cert_arn = None

@@ -16,21 +16,37 @@ def connect_ec2():
 
     return ec2
 
-def create_security_group(vpc):
+def create_security_group(vpc, allowed_inbound_traffic=None, allowed_outbound_traffic=None):
+    # Connect to the Amazon Elastic Compute Cloud (Amazon EC2) service.
     ec2_connection = connect_ec2()
+
+    # Generate Security Group name.
     sg_name = '-'.join(['gp', core.PROJECT_NAME.lower(), core.args.environment.lower()])
+
+    # Create Security Group.
     logger.info('Creating security group (%s).' % sg_name)
-    sg = ec2_connection.create_security_group(sg_name, 'Security Group Description', vpc_id=vpc.id)
+    security_group = ec2_connection.create_security_group(sg_name, 'Security Group Description', vpc_id=vpc.id)
     logger.info('Created security group (%s).' % sg_name)
 
-    sg.authorize('tcp', from_port=80, to_port=80, cidr_ip='0.0.0.0/0')
-    sg.authorize('tcp', from_port=443, to_port=443, cidr_ip='0.0.0.0/0')
-    ec2_connection.revoke_security_group_egress(sg.id, -1, from_port=0, to_port=65535, cidr_ip='0.0.0.0/0')
-    ec2_connection.authorize_security_group_egress(sg.id, 'tcp', from_port=53, to_port=53, cidr_ip='0.0.0.0/0')
-    ec2_connection.authorize_security_group_egress(sg.id, 'udp', from_port=53, to_port=53, cidr_ip='0.0.0.0/0')
-    ec2_connection.authorize_security_group_egress(sg.id, 'tcp', from_port=80, to_port=80, cidr_ip='0.0.0.0/0')
-    ec2_connection.authorize_security_group_egress(sg.id, 'tcp', from_port=443, to_port=443, cidr_ip='0.0.0.0/0')
-    return sg
+    # Set up allowed inbound traffic.
+    for traffic in [traffic.upper() for traffic in allowed_inbound_traffic]:
+        if traffic == 'HTTP':
+            security_group.authorize('tcp', from_port=80, to_port=80, cidr_ip='0.0.0.0/0')
+        if traffic == 'HTTPS':
+            security_group.authorize('tcp', from_port=443, to_port=443, cidr_ip='0.0.0.0/0')
+
+    # Set up allowed outbound traffic.
+    ec2_connection.revoke_security_group_egress(security_group.id, -1, from_port=0, to_port=65535, cidr_ip='0.0.0.0/0')
+    for traffic in [traffic.upper() for traffic in allowed_outbound_traffic]:
+        if traffic == 'HTTP':
+            ec2_connection.authorize_security_group_egress(security_group.id, 'tcp', from_port=80, to_port=80, cidr_ip='0.0.0.0/0')
+        if traffic == 'HTTPS':
+            ec2_connection.authorize_security_group_egress(security_group.id, 'tcp', from_port=443, to_port=443, cidr_ip='0.0.0.0/0')
+        if traffic == 'DNS':
+            ec2_connection.authorize_security_group_egress(security_group.id, 'tcp', from_port=53, to_port=53, cidr_ip='0.0.0.0/0')
+            ec2_connection.authorize_security_group_egress(security_group.id, 'udp', from_port=53, to_port=53, cidr_ip='0.0.0.0/0')
+
+    return security_group
 
 def create_elb(sg, subnets, cert_arn):
     # Connect to the Amazon EC2 Load Balancing (Amazon ELB) service.
@@ -69,11 +85,16 @@ def create_elb(sg, subnets, cert_arn):
 
     return load_balancer
 
-def create_ec2_instances(security_groups, subnets, script=None, instance_profile_name=None, os='ubuntu', image_id=None):
+def create_ec2_instances(vpc, subnets, security_groups=None, script=None, instance_profile_name=None, os='ubuntu', image_id=None):
     instances = list()
+
+    if not security_groups:
+        security_groups = [create_security_group(vpc, allowed_inbound_traffic=['HTTP', 'HTTPS'],
+                                                      allowed_outbound_traffic=['HTTP','HTTPS','DNS'])]
+
     for subnet in subnets:
-        created_instances = create_ec2_instance(security_groups, subnet, script, instance_profile_name, os, image_id)
-        instances = instances + created_instances
+        instance = create_ec2_instance(security_groups, subnet, script, instance_profile_name, os, image_id)
+        instances = instances + instance
     return instances
 
 def create_ec2_instance(security_groups, subnet, script=None, instance_profile_name=None, os='ubuntu', image_id=None):
@@ -104,7 +125,7 @@ def create_ec2_instance(security_groups, subnet, script=None, instance_profile_n
 
     # Create Elastic Network Interface (ENI) specification.
     interface = boto.ec2.networkinterface.NetworkInterfaceSpecification(subnet_id=subnet.id,
-                                                                        groups=[sg.id for sg in security_groups],
+                                                                        groups=[security_group.id for security_group in security_groups],
                                                                         associate_public_ip_address=True)
     interfaces = boto.ec2.networkinterface.NetworkInterfaceCollection(interface)
 

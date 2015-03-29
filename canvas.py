@@ -34,9 +34,10 @@ def main():
     if not vpc.validate_cidr_block(cidr_block):
         sys.exit(1)
 
-    public_vpc = vpc.create_vpc(cidr_block)
-    public_subnets = vpc.create_subnets(public_vpc, zones='all', count=1, byte_aligned=True, public=True)
-    private_subnets = vpc.create_subnets(public_vpc, zones='all', count=1, byte_aligned=True)
+    public_vpc = vpc.create_vpc(cidr_block, internet_connected=True)
+    public_subnets = vpc.create_subnets(public_vpc, zones='all', byte_aligned=True, public=True)
+    private_subnets = vpc.create_subnets(public_vpc, zones='all', byte_aligned=True)
+    instances = ec2.create_ec2_instances(public_vpc, public_subnets)
 
     # archive_name = '.'.join([s3.PROJECT_NAME, 'tar', 'gz'])
     # logger.info('Creating deployment archive (%s).' % archive_name)
@@ -62,9 +63,7 @@ def main():
     # script = ec2.run(script, 'pip3 install virtualenv')
     # script = ec2.run(script, 'pip3 install virtualenvwrapper')
 
-    # instance_profile_name = iam.create_role([policy])
-
-    # instances = ec2.create_ec2_instances([sg], public_subnets, script, instance_profile_name)
+    # instance_profile_name = iam.create_role(policy)
 
     # logger.info('Registering EC2 Instances with Elastic Load Balancer (%s).' % load_balancer.name)
     # elb_connection.register_instances(load_balancer.name, [instance.id for instance in instances])

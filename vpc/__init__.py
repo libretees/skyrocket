@@ -54,7 +54,7 @@ def validate_cidr_block(cidr_block):
         logger.error('Invalid CIDR block given (%s).' % cidr_block)
         return False
 
-def create_vpc(cidr_block, internet_connected=True):
+def create_vpc(cidr_block, internet_connected=False):
     # Connect to the Amazon Virtual Private Cloud (Amazon VPC) service.
     vpc_connection = connect_vpc()
 
@@ -284,7 +284,7 @@ def create_subnets(vpc, zones='All', count=1, byte_aligned=False, balanced=False
         shortened = dict(dict.fromkeys(['resource_type', 'environment', 'subnet_type'], False))
         while len(subnet_name) > 37:
             if not shortened['resource_type']:
-                subnet_name = subnet_name.replace('subnet', 'net')
+                subnet_name = subnet_name.replace('subnet-', '')
                 shortened['resource_type'] = True
                 continue
             if not shortened['subnet_type']:
