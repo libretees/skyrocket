@@ -29,11 +29,20 @@ def create_db_parameter_group(rds):
                                        description=' '.join([PROJECT_NAME, 'Parameter Group'])) #description
     return pg
 
-def create_db_subnet_group(rds, default_subnets):
-    db_subnet_group_name = '-'.join(['net', PROJECT_NAME.lower(), core.args.environment.lower(), 'db'])
-    subnet = rds.create_db_subnet_group(db_subnet_group_name,                        #db_subnet_group_name
-                                        ' '.join([PROJECT_NAME, 'DB Subnet Group']), #db_subnet_group_description
-                                        [subnet.id for subnet in default_subnets])   #subnet_ids
+def create_db_subnet_group(subnets):
+    # Connect to the Amazon Relational Database Service (Amazon RDS).
+    rds_connection = connect_rds()
+
+    # Generate DB Subnet Group name.
+    db_subnet_group_name = '-'.join(['subnetgroup',
+                                     PROJECT_NAME.lower(),
+                                     core.args.environment.lower(),
+                                     'db'])
+
+    # Create DB Subnet Group.
+    subnet = rds_connection.create_db_subnet_group(db_subnet_group_name,                        #db_subnet_group_name
+                                                   ' '.join([PROJECT_NAME, 'DB Subnet Group']), #db_subnet_group_description
+                                                   [subnet.id for subnet in subnets])   #subnet_ids
     return subnet
 
 def create_db_instance(rds, db_parameter_group, db_subnet_group):
