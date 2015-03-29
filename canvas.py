@@ -39,6 +39,8 @@ def main():
     private_subnets = vpc.create_subnets(public_vpc, zones='all', byte_aligned=True)
     instances = ec2.create_ec2_instances(public_vpc, public_subnets)
 
+    db_subnet_group = rds.create_db_subnet_group(private_subnets)
+
     # archive_name = '.'.join([s3.PROJECT_NAME, 'tar', 'gz'])
     # logger.info('Creating deployment archive (%s).' % archive_name)
     # s3.make_tarfile(archive_name, s3.PROJECT_DIRECTORY)
@@ -81,7 +83,6 @@ def main():
     # aws s3 cp --region us-east-1 s3://s3-gossamer-staging-faddde2b/gossamer.tar.gz gossamer.tar.gz
 
     # pg = rds.create_db_parameter_group(rds_connection)
-    # subnet = rds.create_db_subnet_group(rds_connection, default_subnets)
 
     # db = rds.create_db_instance(rds_connection,
     #                             pg,

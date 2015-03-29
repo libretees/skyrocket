@@ -122,6 +122,22 @@ def create_vpc(cidr_block, internet_connected=False):
                 else:
                     raise boto.exception.EC2ResponseError
 
+    # Tag DHCP Options Set.
+    dhcp_options = vpc_connection.get_all_dhcp_options(new_vpc.dhcp_options_id)
+    for dhcp_option in dhcp_options:
+        tagged = False
+        dhcp_option_name = '-'.join(['dopt', core.PROJECT_NAME.lower(), core.args.environment.lower()])
+        while not tagged:
+            try:
+                tagged = ec2_connection.create_tags([dhcp_option.id], {'Name': dhcp_option_name,
+                                                                       'Project': core.PROJECT_NAME.lower(),
+                                                                       'Environment': core.args.environment.lower(),})
+            except boto.exception.EC2ResponseError as error:
+                if error.code == 'InvalidID': # DHCP Options Set hasn't registered with Virtual Private Cloud (VPC) service yet.
+                    pass
+                else:
+                    raise boto.exception.EC2ResponseError
+
     if internet_connected:
         attach_internet_gateway(new_vpc)
 

@@ -24,9 +24,9 @@ def create_security_group(vpc, allowed_inbound_traffic=None, allowed_outbound_tr
     sg_name = '-'.join(['gp', core.PROJECT_NAME.lower(), core.args.environment.lower()])
 
     # Create Security Group.
-    logger.info('Creating security group (%s).' % sg_name)
+    logger.info('Creating Security Group (%s).' % sg_name)
     security_group = ec2_connection.create_security_group(sg_name, 'Security Group Description', vpc_id=vpc.id)
-    logger.info('Created security group (%s).' % sg_name)
+    logger.info('Created Security Group (%s).' % sg_name)
 
     # Set up allowed inbound traffic.
     for traffic in [traffic.upper() for traffic in allowed_inbound_traffic]:
