@@ -16,12 +16,13 @@ def connect_ec2():
 
     return ec2
 
-def create_security_group(vpc, allowed_inbound_traffic=None, allowed_outbound_traffic=None):
+def create_security_group(vpc, name=None, allowed_inbound_traffic=None, allowed_outbound_traffic=None):
     # Connect to the Amazon Elastic Compute Cloud (Amazon EC2) service.
     ec2_connection = connect_ec2()
 
     # Generate Security Group name.
-    sg_name = '-'.join(['gp', core.PROJECT_NAME.lower(), core.args.environment.lower()])
+    if not name:
+        sg_name = '-'.join(['gp', core.PROJECT_NAME.lower(), core.args.environment.lower()])
 
     # Create Security Group.
     logger.info('Creating Security Group (%s).' % sg_name)
@@ -29,22 +30,25 @@ def create_security_group(vpc, allowed_inbound_traffic=None, allowed_outbound_tr
     logger.info('Created Security Group (%s).' % sg_name)
 
     # Set up allowed inbound traffic.
-    for traffic in [traffic.upper() for traffic in allowed_inbound_traffic]:
-        if traffic == 'HTTP':
-            security_group.authorize('tcp', from_port=80, to_port=80, cidr_ip='0.0.0.0/0')
-        if traffic == 'HTTPS':
-            security_group.authorize('tcp', from_port=443, to_port=443, cidr_ip='0.0.0.0/0')
+    if allowed_inbound_traffic:
+        for (protocol, destination) in [(traffic[0].upper(), traffic[1]) for traffic in allowed_inbound_traffic]:
+            if protocol == 'HTTP':
+                security_group.authorize('tcp', from_port=80, to_port=80, cidr_ip=destination)
+            if protocol == 'HTTPS':
+                security_group.authorize('tcp', from_port=443, to_port=443, cidr_ip=destination)
+            logger.info('(%s) Allowed inbound %s traffic from %s.' % (sg_name, protocol, destination))
 
     # Set up allowed outbound traffic.
     ec2_connection.revoke_security_group_egress(security_group.id, -1, from_port=0, to_port=65535, cidr_ip='0.0.0.0/0')
-    for traffic in [traffic.upper() for traffic in allowed_outbound_traffic]:
-        if traffic == 'HTTP':
-            ec2_connection.authorize_security_group_egress(security_group.id, 'tcp', from_port=80, to_port=80, cidr_ip='0.0.0.0/0')
-        if traffic == 'HTTPS':
-            ec2_connection.authorize_security_group_egress(security_group.id, 'tcp', from_port=443, to_port=443, cidr_ip='0.0.0.0/0')
-        if traffic == 'DNS':
-            ec2_connection.authorize_security_group_egress(security_group.id, 'tcp', from_port=53, to_port=53, cidr_ip='0.0.0.0/0')
-            ec2_connection.authorize_security_group_egress(security_group.id, 'udp', from_port=53, to_port=53, cidr_ip='0.0.0.0/0')
+    for (protocol, destination) in [(traffic[0].upper(), traffic[1]) for traffic in allowed_outbound_traffic]:
+        if protocol == 'HTTP':
+            ec2_connection.authorize_security_group_egress(security_group.id, 'tcp', from_port=80, to_port=80, cidr_ip=destination)
+        if protocol == 'HTTPS':
+            ec2_connection.authorize_security_group_egress(security_group.id, 'tcp', from_port=443, to_port=443, cidr_ip=destination)
+        if protocol == 'DNS':
+            ec2_connection.authorize_security_group_egress(security_group.id, 'tcp', from_port=53, to_port=53, cidr_ip=destination)
+            ec2_connection.authorize_security_group_egress(security_group.id, 'udp', from_port=53, to_port=53, cidr_ip=destination)
+        logger.info('(%s) Allowed outbound %s traffic to %s.' % (sg_name, protocol, destination))
 
     return security_group
 
@@ -86,18 +90,22 @@ def create_elb(sg, subnets, cert_arn):
     return load_balancer
 
 def create_ec2_instances(vpc, subnets, security_groups=None, script=None, instance_profile_name=None, os='ubuntu', image_id=None):
-    instances = list()
-
+    # Create a security group, if a security group was not specified.
     if not security_groups:
-        security_groups = [create_security_group(vpc, allowed_inbound_traffic=['HTTP', 'HTTPS'],
-                                                      allowed_outbound_traffic=['HTTP','HTTPS','DNS'])]
+        security_groups = [create_security_group(vpc, allowed_inbound_traffic=[('HTTP',   '0.0.0.0/0')
+                                                                              ,('HTTPS',  '0.0.0.0/0')]
+                                                    , allowed_outbound_traffic=[('HTTP',  '0.0.0.0/0')
+                                                                               ,('HTTPS', '0.0.0.0/0')
+                                                                               ,('DNS',   '0.0.0.0/0')])]
 
+    # Create EC2 instances.
+    instances = list()
     for subnet in subnets:
-        instance = create_ec2_instance(security_groups, subnet, script, instance_profile_name, os, image_id)
+        instance = create_ec2_instance(subnet, security_groups, script, instance_profile_name, os, image_id)
         instances = instances + instance
     return instances
 
-def create_ec2_instance(security_groups, subnet, script=None, instance_profile_name=None, os='ubuntu', image_id=None):
+def create_ec2_instance(subnet, security_groups=None, script=None, instance_profile_name=None, os='ubuntu', image_id=None):
     # Set up dictionary of OSes and their associated quick-start Amazon Machine Images (AMIs).
     ami = {
         'amazon-linux': 'ami-146e2a7c',
