@@ -1,3 +1,4 @@
+import re
 import time
 import random
 import logging
@@ -23,6 +24,8 @@ def create_security_group(vpc, name=None, allowed_inbound_traffic=None, allowed_
     # Generate Security Group name.
     if not name:
         sg_name = '-'.join(['gp', core.PROJECT_NAME.lower(), core.args.environment.lower()])
+    else:
+        sg_name = name
 
     # Create Security Group.
     logger.info('Creating Security Group (%s).' % sg_name)
@@ -31,24 +34,44 @@ def create_security_group(vpc, name=None, allowed_inbound_traffic=None, allowed_
 
     # Set up allowed inbound traffic.
     if allowed_inbound_traffic:
-        for (protocol, destination) in [(traffic[0].upper(), traffic[1]) for traffic in allowed_inbound_traffic]:
+        for (protocol, source) in [(traffic[0].upper(), traffic[1]) for traffic in allowed_inbound_traffic]:
+            # Determine whether source is a CIDR block or a Security Group.
+            is_cidr_ip = re.search('^(25[0-5]|2[0-4]\d|1\d\d|[1-9]?\d)\.'+ # A in A.B.C.D
+                                   '(25[0-5]|2[0-4]\d|1\d\d|[1-9]?\d)\.' + # B in A.B.C.D
+                                   '(25[0-5]|2[0-4]\d|1\d\d|[1-9]?\d)\.' + # C in A.B.C.D
+                                   '(25[0-5]|2[0-4]\d|1\d\d|[1-9]?\d)'   + # D in A.B.C.D
+                                   '(/(([1-2]?[0-9])|(3[0-2])))$', source) # /0 through /32
+            cidr_ip = source if is_cidr_ip else None
+            src_group = source if not is_cidr_ip else None
+
+            # Create ingress rules.
             if protocol == 'HTTP':
-                security_group.authorize('tcp', from_port=80, to_port=80, cidr_ip=destination)
+                security_group.authorize(ip_protocol='tcp', from_port=80, to_port=80, src_group=src_group, cidr_ip=cidr_ip)
             if protocol == 'HTTPS':
-                security_group.authorize('tcp', from_port=443, to_port=443, cidr_ip=destination)
-            logger.info('(%s) Allowed inbound %s traffic from %s.' % (sg_name, protocol, destination))
+                security_group.authorize(ip_protocol='tcp', from_port=443, to_port=443, src_group=src_group, cidr_ip=cidr_ip)
+            logger.info('Security Group (%s) allowed inbound %s traffic from %s.' % (sg_name, protocol, source))
 
     # Set up allowed outbound traffic.
     ec2_connection.revoke_security_group_egress(security_group.id, -1, from_port=0, to_port=65535, cidr_ip='0.0.0.0/0')
     for (protocol, destination) in [(traffic[0].upper(), traffic[1]) for traffic in allowed_outbound_traffic]:
+        # Determine whether destination is a CIDR block or a Security Group.
+        is_cidr_ip = re.search('^(25[0-5]|2[0-4]\d|1\d\d|[1-9]?\d)\.'     + # A in A.B.C.D
+                               '(25[0-5]|2[0-4]\d|1\d\d|[1-9]?\d)\.'      + # B in A.B.C.D
+                               '(25[0-5]|2[0-4]\d|1\d\d|[1-9]?\d)\.'      + # C in A.B.C.D
+                               '(25[0-5]|2[0-4]\d|1\d\d|[1-9]?\d)'        + # D in A.B.C.D
+                               '(/(([1-2]?[0-9])|(3[0-2])))$', destination) # /0 through /32
+        cidr_ip = destination if is_cidr_ip else None
+        src_group = destination if not is_cidr_ip else None
+
+        # Create egress rules.
         if protocol == 'HTTP':
-            ec2_connection.authorize_security_group_egress(security_group.id, 'tcp', from_port=80, to_port=80, cidr_ip=destination)
+            ec2_connection.authorize_security_group_egress(security_group.id, 'tcp', from_port=80, to_port=80, src_group_id=src_group, cidr_ip=cidr_ip)
         if protocol == 'HTTPS':
-            ec2_connection.authorize_security_group_egress(security_group.id, 'tcp', from_port=443, to_port=443, cidr_ip=destination)
+            ec2_connection.authorize_security_group_egress(security_group.id, 'tcp', from_port=443, to_port=443, src_group_id=src_group, cidr_ip=cidr_ip)
         if protocol == 'DNS':
-            ec2_connection.authorize_security_group_egress(security_group.id, 'tcp', from_port=53, to_port=53, cidr_ip=destination)
-            ec2_connection.authorize_security_group_egress(security_group.id, 'udp', from_port=53, to_port=53, cidr_ip=destination)
-        logger.info('(%s) Allowed outbound %s traffic to %s.' % (sg_name, protocol, destination))
+            ec2_connection.authorize_security_group_egress(security_group.id, 'tcp', from_port=53, to_port=53, src_group_id=src_group, cidr_ip=cidr_ip)
+            ec2_connection.authorize_security_group_egress(security_group.id, 'udp', from_port=53, to_port=53, src_group_id=src_group, cidr_ip=cidr_ip)
+        logger.info('Security Group (%s) allowed outbound %s traffic to %s.' % (sg_name, protocol, destination))
 
     return security_group
 
@@ -89,6 +112,18 @@ def create_elb(sg, subnets, cert_arn):
 
     return load_balancer
 
+def create_nat_instances(vpc, subnets, security_groups=None, script=None, instance_profile_name=None, os='ubuntu', image_id=None):
+    instances = list()
+
+    if not security_groups:
+        security_groups = [create_security_group(vpc, allowed_inbound_traffic=[('HTTP',   '0.0.0.0/0')
+                                                                              ,('HTTPS',  '0.0.0.0/0')]
+                                                    , allowed_outbound_traffic=[('HTTP',  '0.0.0.0/0')
+                                                                               ,('HTTPS', '0.0.0.0/0')
+                                                                               ,('DNS',   '0.0.0.0/0')])]
+
+    return instances
+
 def create_ec2_instances(vpc, subnets, security_groups=None, script=None, instance_profile_name=None, os='ubuntu', image_id=None):
     # Create a security group, if a security group was not specified.
     if not security_groups:
@@ -105,7 +140,7 @@ def create_ec2_instances(vpc, subnets, security_groups=None, script=None, instan
         instances = instances + instance
     return instances
 
-def create_ec2_instance(subnet, security_groups=None, script=None, instance_profile_name=None, os='ubuntu', image_id=None):
+def create_ec2_instance(subnet, security_groups=None, script=None, instance_profile=None, os='ubuntu', image_id=None):
     # Set up dictionary of OSes and their associated quick-start Amazon Machine Images (AMIs).
     ami = {
         'amazon-linux': 'ami-146e2a7c',
@@ -142,7 +177,7 @@ def create_ec2_instance(subnet, security_groups=None, script=None, instance_prof
     logger.info('Creating EC2 Instance (%s) in %s.' % (ec2_instance_name, subnet.availability_zone))
     reservation = ec2_connection.run_instances(image_id,                 # image_id
                                                instance_type='t2.micro',
-                                               instance_profile_name=instance_profile_name,
+                                               instance_profile_name=instance_profile.name if instance_profile else None,
                                                network_interfaces=interfaces,
                                                user_data=script)
     logger.info('Created EC2 Instance (%s).' % ec2_instance_name)

@@ -38,9 +38,9 @@ def main():
     public_subnets = vpc.create_subnets(public_vpc, zones='all', byte_aligned=True, public=True)
     private_subnets = vpc.create_subnets(public_vpc, zones='all', byte_aligned=True)
 
-    nat_instances = ec2.create_nat_instances(public_vpc, public_subnets)
+    #nat_instances = ec2.create_nat_instances(public_vpc, public_subnets)
 
-    #instances = ec2.create_ec2_instances(public_vpc, public_subnets)
+    instances = ec2.create_ec2_instances(public_vpc, public_subnets)
 
     #db_subnet_group = rds.create_db_subnet_group(private_subnets)
 
