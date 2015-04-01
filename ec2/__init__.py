@@ -23,14 +23,12 @@ def create_security_group(vpc, name=None, allowed_inbound_traffic=None, allowed_
 
     # Generate Security Group name.
     if not name:
-        sg_name = '-'.join(['gp', core.PROJECT_NAME.lower(), core.args.environment.lower()])
-    else:
-        sg_name = name
+        name = '-'.join(['gp', core.PROJECT_NAME.lower(), core.args.environment.lower()])
 
     # Create Security Group.
-    logger.info('Creating Security Group (%s).' % sg_name)
-    security_group = ec2_connection.create_security_group(sg_name, 'Security Group Description', vpc_id=vpc.id)
-    logger.info('Created Security Group (%s).' % sg_name)
+    logger.info('Creating Security Group (%s).' % name)
+    security_group = ec2_connection.create_security_group(name, 'Security Group Description', vpc_id=vpc.id)
+    logger.info('Created Security Group (%s).' % name)
 
     # Set up inbound/outbound rules.
     ec2_connection.revoke_security_group_egress(security_group.id, -1, from_port=0, to_port=65535, cidr_ip='0.0.0.0/0')
@@ -52,7 +50,7 @@ def create_security_group(vpc, name=None, allowed_inbound_traffic=None, allowed_
                 security_group.authorize(ip_protocol='tcp', from_port=80, to_port=80, src_group=target_group, cidr_ip=target_cidr_ip)
             if protocol == 'HTTPS':
                 security_group.authorize(ip_protocol='tcp', from_port=443, to_port=443, src_group=target_group, cidr_ip=target_cidr_ip)
-            logger.info('Security Group (%s) allowed inbound %s traffic from %s.' % (sg_name, protocol, target))
+            logger.info('Security Group (%s) allowed inbound %s traffic from %s.' % (name, protocol, target))
 
         # Create outbound rules.
         if rule_type == 'outbound':
@@ -63,7 +61,7 @@ def create_security_group(vpc, name=None, allowed_inbound_traffic=None, allowed_
             if protocol == 'DNS':
                 ec2_connection.authorize_security_group_egress(security_group.id, 'tcp', from_port=53, to_port=53, src_group_id=target_group, cidr_ip=target_cidr_ip)
                 ec2_connection.authorize_security_group_egress(security_group.id, 'udp', from_port=53, to_port=53, src_group_id=target_group, cidr_ip=target_cidr_ip)
-            logger.info('Security Group (%s) allowed outbound %s traffic to %s.' % (sg_name, protocol, target))
+            logger.info('Security Group (%s) allowed outbound %s traffic to %s.' % (name, protocol, target))
 
     return security_group
 
@@ -104,19 +102,30 @@ def create_elb(sg, subnets, cert_arn):
 
     return load_balancer
 
-def create_nat_instances(vpc, subnets, security_groups=None, script=None, instance_profile_name=None, os='ubuntu', image_id=None):
-    instances = list()
+def create_nat_instance(vpc, public_subnet, private_subnet, security_groups=None, script=None, instance_profile_name=None, os='ubuntu', image_id=None):
+    # Connect to the Amazon Elastic Compute Cloud (Amazon EC2) service.
+    ec2_connection = connect_ec2()
 
     if not security_groups:
-        security_groups = [create_security_group(vpc, allowed_inbound_traffic=[('HTTP',   '0.0.0.0/0')
-                                                                              ,('HTTPS',  '0.0.0.0/0')]
+        security_groups = [create_security_group(vpc, name='nat-sg'
+                                                    , allowed_inbound_traffic=[('HTTP',   private_subnet.cidr_block)
+                                                                              ,('HTTPS',  private_subnet.cidr_block)]
                                                     , allowed_outbound_traffic=[('HTTP',  '0.0.0.0/0')
                                                                                ,('HTTPS', '0.0.0.0/0')
                                                                                ,('DNS',   '0.0.0.0/0')])]
 
-    return instances
+    if not image_id:
+        image_id = get_nat_image()
 
-def create_ec2_instances(vpc, subnets, security_groups=None, script=None, instance_profile_name=None, os='ubuntu', image_id=None):
+    # Create NAT Instance.
+    instance = create_ec2_instance(public_subnet, name='ec2-nat', security_groups=security_groups, image_id=image_id.id)[0]
+
+    # Disable source/destination checking.
+    ec2_connection.modify_instance_attribute(instance.id, attribute='sourceDestCheck', value=False, dry_run=False)
+
+    return instance
+
+def create_ec2_instances(vpc, subnets, security_groups=None, script=None, instance_profile=None, os='ubuntu', image_id=None):
     # Create a security group, if a security group was not specified.
     if not security_groups:
         security_groups = [create_security_group(vpc, allowed_inbound_traffic=[('HTTP',   '0.0.0.0/0')
@@ -128,11 +137,11 @@ def create_ec2_instances(vpc, subnets, security_groups=None, script=None, instan
     # Create EC2 instances.
     instances = list()
     for subnet in subnets:
-        instance = create_ec2_instance(subnet, security_groups, script, instance_profile_name, os, image_id)
+        instance = create_ec2_instance(subnet, security_groups=security_groups, script=script, instance_profile=instance_profile, os=os, image_id=image_id)
         instances = instances + instance
     return instances
 
-def create_ec2_instance(subnet, security_groups=None, script=None, instance_profile=None, os='ubuntu', image_id=None):
+def create_ec2_instance(subnet, name=None, security_groups=None, script=None, instance_profile=None, os='ubuntu', image_id=None):
     # Set up dictionary of OSes and their associated quick-start Amazon Machine Images (AMIs).
     ami = {
         'amazon-linux': 'ami-146e2a7c',

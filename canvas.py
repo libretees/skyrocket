@@ -35,12 +35,12 @@ def main():
         sys.exit(1)
 
     public_vpc = vpc.create_vpc(cidr_block, internet_connected=True)
-    public_subnets = vpc.create_subnets(public_vpc, zones='all', byte_aligned=True, public=True)
-    private_subnets = vpc.create_subnets(public_vpc, zones='all', byte_aligned=True)
+    public_subnets = vpc.create_subnets(public_vpc, zones='us-east-1b', byte_aligned=True, public=True)
+    private_subnets = vpc.create_subnets(public_vpc, zones='us-east-1b', byte_aligned=True)
 
-    #nat_instances = ec2.create_nat_instances(public_vpc, public_subnets)
+    nat_instances = ec2.create_nat_instance(public_vpc, public_subnets[0], private_subnets[0])
 
-    instances = ec2.create_ec2_instances(public_vpc, public_subnets)
+    #instances = ec2.create_ec2_instances(public_vpc, public_subnets)
 
     #db_subnet_group = rds.create_db_subnet_group(private_subnets)
 

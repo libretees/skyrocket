@@ -3,7 +3,7 @@ import logging
 import boto
 import core
 
-#PROJECT_NAME = core.PROJECT_NAME
+PROJECT_NAME = core.PROJECT_NAME
 #DJANGO_ENGINE = core.settings.DATABASES['default']['ENGINE']
 
 logger = logging.getLogger(__name__)
