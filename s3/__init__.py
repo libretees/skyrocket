@@ -7,7 +7,7 @@ import core
 
 PROJECT_NAME = core.PROJECT_NAME
 PROJECT_DIRECTORY = core.PROJECT_DIRECTORY
-DJANGO_ENGINE = core.settings.DATABASES['default']['ENGINE']
+#DJANGO_ENGINE = core.settings.DATABASES['default']['ENGINE']
 
 logger = logging.getLogger(__name__)
 

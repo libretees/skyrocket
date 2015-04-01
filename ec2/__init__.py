@@ -32,46 +32,38 @@ def create_security_group(vpc, name=None, allowed_inbound_traffic=None, allowed_
     security_group = ec2_connection.create_security_group(sg_name, 'Security Group Description', vpc_id=vpc.id)
     logger.info('Created Security Group (%s).' % sg_name)
 
-    # Set up allowed inbound traffic.
-    if allowed_inbound_traffic:
-        for (protocol, source) in [(traffic[0].upper(), traffic[1]) for traffic in allowed_inbound_traffic]:
-            # Determine whether source is a CIDR block or a Security Group.
-            is_cidr_ip = re.search('^(25[0-5]|2[0-4]\d|1\d\d|[1-9]?\d)\.'+ # A in A.B.C.D
-                                   '(25[0-5]|2[0-4]\d|1\d\d|[1-9]?\d)\.' + # B in A.B.C.D
-                                   '(25[0-5]|2[0-4]\d|1\d\d|[1-9]?\d)\.' + # C in A.B.C.D
-                                   '(25[0-5]|2[0-4]\d|1\d\d|[1-9]?\d)'   + # D in A.B.C.D
-                                   '(/(([1-2]?[0-9])|(3[0-2])))$', source) # /0 through /32
-            cidr_ip = source if is_cidr_ip else None
-            src_group = source if not is_cidr_ip else None
-
-            # Create ingress rules.
-            if protocol == 'HTTP':
-                security_group.authorize(ip_protocol='tcp', from_port=80, to_port=80, src_group=src_group, cidr_ip=cidr_ip)
-            if protocol == 'HTTPS':
-                security_group.authorize(ip_protocol='tcp', from_port=443, to_port=443, src_group=src_group, cidr_ip=cidr_ip)
-            logger.info('Security Group (%s) allowed inbound %s traffic from %s.' % (sg_name, protocol, source))
-
-    # Set up allowed outbound traffic.
+    # Set up inbound/outbound rules.
     ec2_connection.revoke_security_group_egress(security_group.id, -1, from_port=0, to_port=65535, cidr_ip='0.0.0.0/0')
-    for (protocol, destination) in [(traffic[0].upper(), traffic[1]) for traffic in allowed_outbound_traffic]:
-        # Determine whether destination is a CIDR block or a Security Group.
-        is_cidr_ip = re.search('^(25[0-5]|2[0-4]\d|1\d\d|[1-9]?\d)\.'     + # A in A.B.C.D
-                               '(25[0-5]|2[0-4]\d|1\d\d|[1-9]?\d)\.'      + # B in A.B.C.D
-                               '(25[0-5]|2[0-4]\d|1\d\d|[1-9]?\d)\.'      + # C in A.B.C.D
-                               '(25[0-5]|2[0-4]\d|1\d\d|[1-9]?\d)'        + # D in A.B.C.D
-                               '(/(([1-2]?[0-9])|(3[0-2])))$', destination) # /0 through /32
-        cidr_ip = destination if is_cidr_ip else None
-        src_group = destination if not is_cidr_ip else None
+    for (protocol, target, rule_type) in [(traffic[0].upper(), traffic[1], 'inbound') for traffic in allowed_inbound_traffic] + \
+                                         [(traffic[0].upper(), traffic[1], 'outbound') for traffic in allowed_outbound_traffic]:
 
-        # Create egress rules.
-        if protocol == 'HTTP':
-            ec2_connection.authorize_security_group_egress(security_group.id, 'tcp', from_port=80, to_port=80, src_group_id=src_group, cidr_ip=cidr_ip)
-        if protocol == 'HTTPS':
-            ec2_connection.authorize_security_group_egress(security_group.id, 'tcp', from_port=443, to_port=443, src_group_id=src_group, cidr_ip=cidr_ip)
-        if protocol == 'DNS':
-            ec2_connection.authorize_security_group_egress(security_group.id, 'tcp', from_port=53, to_port=53, src_group_id=src_group, cidr_ip=cidr_ip)
-            ec2_connection.authorize_security_group_egress(security_group.id, 'udp', from_port=53, to_port=53, src_group_id=src_group, cidr_ip=cidr_ip)
-        logger.info('Security Group (%s) allowed outbound %s traffic to %s.' % (sg_name, protocol, destination))
+        # Determine whether target is a CIDR block or a Security Group.
+        is_cidr_ip = re.search('^(25[0-5]|2[0-4]\d|1\d\d|[1-9]?\d)\.'+ # A in A.B.C.D
+                               '(25[0-5]|2[0-4]\d|1\d\d|[1-9]?\d)\.' + # B in A.B.C.D
+                               '(25[0-5]|2[0-4]\d|1\d\d|[1-9]?\d)\.' + # C in A.B.C.D
+                               '(25[0-5]|2[0-4]\d|1\d\d|[1-9]?\d)'   + # D in A.B.C.D
+                               '(/(([1-2]?[0-9])|(3[0-2])))$', target) # /0 through /32
+        target_cidr_ip = target if is_cidr_ip else None
+        target_group = target if not is_cidr_ip else None
+
+        # Create inbound rules.
+        if rule_type == 'inbound':
+            if protocol == 'HTTP':
+                security_group.authorize(ip_protocol='tcp', from_port=80, to_port=80, src_group=target_group, cidr_ip=target_cidr_ip)
+            if protocol == 'HTTPS':
+                security_group.authorize(ip_protocol='tcp', from_port=443, to_port=443, src_group=target_group, cidr_ip=target_cidr_ip)
+            logger.info('Security Group (%s) allowed inbound %s traffic from %s.' % (sg_name, protocol, target))
+
+        # Create outbound rules.
+        if rule_type == 'outbound':
+            if protocol == 'HTTP':
+                ec2_connection.authorize_security_group_egress(security_group.id, 'tcp', from_port=80, to_port=80, src_group_id=target_group, cidr_ip=target_cidr_ip)
+            if protocol == 'HTTPS':
+                ec2_connection.authorize_security_group_egress(security_group.id, 'tcp', from_port=443, to_port=443, src_group_id=target_group, cidr_ip=target_cidr_ip)
+            if protocol == 'DNS':
+                ec2_connection.authorize_security_group_egress(security_group.id, 'tcp', from_port=53, to_port=53, src_group_id=target_group, cidr_ip=target_cidr_ip)
+                ec2_connection.authorize_security_group_egress(security_group.id, 'udp', from_port=53, to_port=53, src_group_id=target_group, cidr_ip=target_cidr_ip)
+            logger.info('Security Group (%s) allowed outbound %s traffic to %s.' % (sg_name, protocol, target))
 
     return security_group
 
