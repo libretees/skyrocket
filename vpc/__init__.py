@@ -89,6 +89,23 @@ def create_vpc(cidr_block, internet_connected=False):
             else:
                 raise boto.exception.EC2ResponseError
 
+    # Tag default Security Group.
+    security_groups = ec2_connection.get_all_security_groups(filters={'vpc-id': new_vpc.id,})
+    for security_group in security_groups:
+        tagged = False
+        security_group_name = '-'.join(['gp', core.PROJECT_NAME.lower(), core.args.environment.lower(), 'default'])
+        while not tagged:
+            try:
+                tagged = ec2_connection.create_tags([security_group.id], {'Name': security_group_name,
+                                                                          'Project': core.PROJECT_NAME.lower(),
+                                                                          'Environment': core.args.environment.lower(),
+                                                                          'Type': 'default',})
+            except boto.exception.EC2ResponseError as error:
+                if error.code == 'InvalidID': # Security Group hasn't registered with Virtual Private Cloud (VPC) service yet.
+                    pass
+                else:
+                    raise boto.exception.EC2ResponseError
+
     # Tag Main Route Table.
     route_tables = vpc_connection.get_all_route_tables(filters={'vpc-id': new_vpc.id,})
     for route_table in route_tables:

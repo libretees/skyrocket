@@ -64,6 +64,19 @@ def create_security_group(vpc, name=None, allowed_inbound_traffic=None, allowed_
                 ec2_connection.authorize_security_group_egress(security_group.id, 'udp', from_port=53, to_port=53, src_group_id=target_group, cidr_ip=target_cidr_ip)
             logger.info('Security Group (%s) allowed outbound %s traffic to %s.' % (name, protocol, target))
 
+    # Tag Security Group.
+    tagged = False
+    while not tagged:
+        try:
+            tagged = ec2_connection.create_tags(security_group.id, {'Name': name,
+                                                                    'Project': core.PROJECT_NAME.lower(),
+                                                                    'Environment': core.args.environment.lower(),})
+        except boto.exception.EC2ResponseError as error:
+            if error.code == 'InvalidID': # Security Group hasn't registered with EC2 service yet.
+                pass
+            else:
+                raise boto.exception.EC2ResponseError
+
     return security_group
 
 def create_elb(sg, subnets, cert_arn):
