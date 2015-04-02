@@ -173,6 +173,14 @@ def create_nat_instance(vpc, public_subnet, private_subnet, name=None, security_
     else:
         logger.error('Subnet (%s) not associated to (%s).' % (private_subnet.id, route_table.name))
 
+    # Clean up unused/orphaned Route Tables.
+    route_tables = vpc_connection.get_all_route_tables(filters={'vpc-id': vpc.id,})
+    main_route_table = vpc_connection.get_all_route_tables(filters={'vpc-id': vpc.id,
+                                                                    'association.main': 'true'})[0] # Affected by boto Issue #1742.
+    empty_route_tables = [route_table for route_table in route_tables if not len(route_table.associations) and not route_table.id == main_route_table.id]
+    for route_table in empty_route_tables:
+        vpc_connection.delete_route_table(route_table.id, dry_run=False)
+
     return nat_instance
 
 def create_ec2_instances(vpc, subnets, role=None, security_groups=None, script=None, instance_profile=None, os='ubuntu', image_id=None):
