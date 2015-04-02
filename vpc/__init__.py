@@ -213,7 +213,15 @@ def create_route_table(vpc, name=None, internet_access=False):
                                     dry_run=False)
 
         # Refresh Route Table.
-        route_table = vpc_connection.get_all_route_tables(route_table.id)[0]
+        refreshed = False
+        while not refreshed:
+            try:
+                route_table = vpc_connection.get_all_route_tables(route_table.id)
+                route_table = route_table[0] if len(route_table) else None
+                refreshed = True
+            except boto.exception.EC2ResponseError as error:
+                if error.code == 'InvalidRouteTableID.NotFound':
+                    pass
 
     # Generate Route Table name.
     route_tables = vpc_connection.get_all_route_tables(filters={'vpc-id': vpc.id,})

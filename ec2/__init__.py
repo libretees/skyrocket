@@ -103,7 +103,22 @@ def create_elb(sg, subnets, cert_arn):
 
     return load_balancer
 
-def create_nat_instance(vpc, public_subnet, private_subnet, name=None, security_groups=None, script=None, instance_profile_name=None, os='ubuntu', image_id=None):
+def create_nat_instances(vpc, public_subnets, private_subnets, security_groups=None, image_id=None):
+
+    if not len(public_subnets) == len(private_subnets):
+        raise RuntimeError('The number of Public/Private Subnets must match (Public: %d Private: %d).' % (len(public_subnets), len(private_subnets)))
+
+    subnet_pairs = list(zip(sorted(public_subnets, key=lambda x: x.availability_zone), sorted(private_subnets, key=lambda x: x.availability_zone)))
+
+    # Create NAT instances.
+    nat_instances = list()
+    for (public_subnet, private_subnet) in subnet_pairs:
+        nat_instance = create_nat_instance(vpc, public_subnet, private_subnet, name=None, security_groups=None, image_id=None)
+        nat_instances.append(nat_instance)
+
+    return nat_instances
+
+def create_nat_instance(vpc, public_subnet, private_subnet, name=None, security_groups=None, image_id=None):
     # Connect to the Amazon Elastic Compute Cloud (Amazon EC2) service.
     ec2_connection = connect_ec2()
 
@@ -176,10 +191,14 @@ def create_nat_instance(vpc, public_subnet, private_subnet, name=None, security_
     # Clean up unused/orphaned Route Tables.
     route_tables = vpc_connection.get_all_route_tables(filters={'vpc-id': vpc.id,})
     main_route_table = vpc_connection.get_all_route_tables(filters={'vpc-id': vpc.id,
-                                                                    'association.main': 'true'})[0] # Affected by boto Issue #1742.
+                                                                    'association.main': 'true'})[0] # Affected by boto Issue #1742 : https://github.com/boto/boto/issues/1742
     empty_route_tables = [route_table for route_table in route_tables if not len(route_table.associations) and not route_table.id == main_route_table.id]
     for route_table in empty_route_tables:
-        vpc_connection.delete_route_table(route_table.id, dry_run=False)
+        try:
+            vpc_connection.delete_route_table(route_table.id, dry_run=False)
+        except boto.exception.EC2ResponseError as error:
+            if error.code == 'DependencyViolation': # Route Table was not actually empty.
+                pass
 
     return nat_instance
 
