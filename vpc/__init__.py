@@ -369,10 +369,8 @@ def create_subnet(vpc, zone, cidr_block, subnet_name=None, route_table=None):
                                                               subnet.id,      # subnet_id
                                                               dry_run=False)
         if len(association_id):
-            subnet.association_id = association_id
             logger.debug('Subnet (%s) associated to (%s).' % (subnet_name, route_table.id))
         else:
-            subnet.association_id = None
             logger.error('Subnet (%s) not associated to (%s).' % (subnet_name, route_table.id))
 
         # Determine Subnet type.

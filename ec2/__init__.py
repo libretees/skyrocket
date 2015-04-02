@@ -103,35 +103,45 @@ def create_elb(sg, subnets, cert_arn):
 
     return load_balancer
 
-def create_nat_instance(vpc, public_subnet, private_subnet, security_groups=None, script=None, instance_profile_name=None, os='ubuntu', image_id=None):
+def create_nat_instance(vpc, public_subnet, private_subnet, name=None, security_groups=None, script=None, instance_profile_name=None, os='ubuntu', image_id=None):
     # Connect to the Amazon Elastic Compute Cloud (Amazon EC2) service.
     ec2_connection = connect_ec2()
 
     # Connect to the Amazon Virtual Private Cloud (Amazon VPC) service.
     vpc_connection = vpc_pkg.connect_vpc()
 
+    # Create Security Group, if one was not specified.
     if not security_groups:
-        security_groups = [create_security_group(vpc, name='nat-sg'
+        sg_name = '-'.join(['gp', core.PROJECT_NAME.lower(), core.args.environment.lower(), public_subnet.availability_zone, 'nat'])
+        security_groups = [create_security_group(vpc, name=sg_name
                                                     , allowed_inbound_traffic=[('HTTP',   private_subnet.cidr_block)
                                                                               ,('HTTPS',  private_subnet.cidr_block)]
                                                     , allowed_outbound_traffic=[('HTTP',  '0.0.0.0/0')
                                                                                ,('HTTPS', '0.0.0.0/0')
                                                                                ,('DNS',   '0.0.0.0/0')])]
 
+    # Get Amazon Linux VPC NAT AMI, if one was not specified.
     if not image_id:
         image_id = get_nat_image()
 
+    # Generate name, if one was not specified.
+    if not name:
+        name = '-'.join(['ec2', core.PROJECT_NAME.lower(), core.args.environment.lower(), public_subnet.availability_zone, 'nat'])
+
     # Create NAT Instance.
-    nat_instance = create_ec2_instance(public_subnet, name='ec2-nat', security_groups=security_groups, image_id=image_id.id)[0]
+    nat_instance = create_ec2_instance(public_subnet, name=name, role='nat', security_groups=security_groups, image_id=image_id.id)[0]
 
     # Disable source/destination checking.
     ec2_connection.modify_instance_attribute(nat_instance.id, attribute='sourceDestCheck', value=False, dry_run=False)
 
     # Create Route table.
-    route_table = vpc_pkg.create_route_table(vpc, name='test', internet_access=False)
+    route_table_name = '-'.join(['rtb', core.PROJECT_NAME.lower(), core.args.environment.lower(), public_subnet.availability_zone, 'private'])
+    route_table = vpc_pkg.create_route_table(vpc, name=route_table_name, internet_access=False)
 
     # Wait for NAT instance to run.
+    logger.info('Waiting for NAT instance to run (%s)...' % nat_instance.id)
     while (not nat_instance.state == 'running'):
+        logger.debug('Waiting for NAT instance to run (%s)...' % nat_instance.id)
         time.sleep(1)
         nat_instance.update()
 
@@ -144,21 +154,28 @@ def create_nat_instance(vpc, public_subnet, private_subnet, security_groups=None
                                 vpc_peering_connection_id=None,
                                 dry_run=False)
 
+    # Check for existing Route Table association.
+    route_tables = vpc_connection.get_all_route_tables(filters={'vpc-id': vpc.id,})
+    existing_association = [association.id for route_table in route_tables for association in route_table.associations if association.subnet_id == private_subnet.id]
+    existing_association = existing_association[0] if existing_association else None
+
     # Associate Private Subnet to Route Table.
-    private_subnet.association_id = vpc_connection.replace_route_table_association_with_assoc(private_subnet.association_id, # association_id
-                                                                                              route_table.id,                # route_table_id
-                                                                                              dry_run=False)
-    #association = vpc_connection.associate_route_table(route_table.id,    # route_table_id
-    #                                                   private_subnet.id, # subnet_id
-    #                                                   dry_run=False)
-    if len(private_subnet.association_id):
+    if existing_association:
+        association = vpc_connection.replace_route_table_association_with_assoc(existing_association, # association_id
+                                                                                route_table.id,       # route_table_id
+                                                                                dry_run=False)
+    else:
+        association = vpc_connection.associate_route_table(route_table.id,    # route_table_id
+                                                           private_subnet.id, # subnet_id
+                                                           dry_run=False)
+    if len(association):
         logger.debug('Subnet (%s) associated to (%s).' % (private_subnet.id, route_table.name))
     else:
         logger.error('Subnet (%s) not associated to (%s).' % (private_subnet.id, route_table.name))
 
     return nat_instance
 
-def create_ec2_instances(vpc, subnets, security_groups=None, script=None, instance_profile=None, os='ubuntu', image_id=None):
+def create_ec2_instances(vpc, subnets, role=None, security_groups=None, script=None, instance_profile=None, os='ubuntu', image_id=None):
     # Create a security group, if a security group was not specified.
     if not security_groups:
         security_groups = [create_security_group(vpc, allowed_inbound_traffic=[('HTTP',   '0.0.0.0/0')
@@ -170,11 +187,11 @@ def create_ec2_instances(vpc, subnets, security_groups=None, script=None, instan
     # Create EC2 instances.
     instances = list()
     for subnet in subnets:
-        instance = create_ec2_instance(subnet, security_groups=security_groups, script=script, instance_profile=instance_profile, os=os, image_id=image_id)
+        instance = create_ec2_instance(subnet, role=role, security_groups=security_groups, script=script, instance_profile=instance_profile, os=os, image_id=image_id)
         instances = instances + instance
     return instances
 
-def create_ec2_instance(subnet, name=None, security_groups=None, script=None, instance_profile=None, os='ubuntu', image_id=None):
+def create_ec2_instance(subnet, name=None, role=None, security_groups=None, script=None, instance_profile=None, os='ubuntu', image_id=None):
     # Set up dictionary of OSes and their associated quick-start Amazon Machine Images (AMIs).
     ami = {
         'amazon-linux': 'ami-146e2a7c',
@@ -194,11 +211,13 @@ def create_ec2_instance(subnet, name=None, security_groups=None, script=None, in
     else:
         image_id = ami[os]
 
-    # Generate random identifier.
-    random_id = '{:08x}'.format(random.randrange(2**32))
+    # Generate EC2 Instance name, if one was not specified.
+    if not name:
+        random_id = '{:08x}'.format(random.randrange(2**32))
+        name = '-'.join(['ec2', core.PROJECT_NAME.lower(), core.args.environment.lower(), random_id])
 
     # Generate Elastic Network Interface (ENI) name.
-    eni_name = '-'.join(['eni', core.PROJECT_NAME.lower(), core.args.environment.lower(), random_id])
+    eni_name = '-'.join(['eni', name.replace('ec2-', '')])
 
     # Create Elastic Network Interface (ENI) specification.
     interface = boto.ec2.networkinterface.NetworkInterfaceSpecification(subnet_id=subnet.id,
@@ -207,14 +226,13 @@ def create_ec2_instance(subnet, name=None, security_groups=None, script=None, in
     interfaces = boto.ec2.networkinterface.NetworkInterfaceCollection(interface)
 
     # Create EC2 Reservation.
-    ec2_instance_name = '-'.join(['ec2', core.PROJECT_NAME.lower(), core.args.environment.lower(), random_id])
-    logger.info('Creating EC2 Instance (%s) in %s.' % (ec2_instance_name, subnet.availability_zone))
+    logger.info('Creating EC2 Instance (%s) in %s.' % (name, subnet.availability_zone))
     reservation = ec2_connection.run_instances(image_id,                 # image_id
                                                instance_type='t2.micro',
                                                instance_profile_name=instance_profile.name if instance_profile else None,
                                                network_interfaces=interfaces,
                                                user_data=script)
-    logger.info('Created EC2 Instance (%s).' % ec2_instance_name)
+    logger.info('Created EC2 Instance (%s).' % name)
 
     # Get EC2 Instances.
     instances = [instances for instances in reservation.instances]
@@ -223,9 +241,10 @@ def create_ec2_instance(subnet, name=None, security_groups=None, script=None, in
     tagged = False
     while not tagged:
         try:
-            tagged = ec2_connection.create_tags([instance.id for instance in instances], {'Name': ec2_instance_name,
+            tagged = ec2_connection.create_tags([instance.id for instance in instances], {'Name': name,
                                                                                           'Project': core.PROJECT_NAME.lower(),
-                                                                                          'Environment': core.args.environment.lower()})
+                                                                                          'Environment': core.args.environment.lower(),
+                                                                                          'Role': role,})
         except boto.exception.EC2ResponseError as error:
             if error.code == 'InvalidInstanceID.NotFound': # Instance hasn't registered with EC2 service yet.
                 pass
