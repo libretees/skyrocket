@@ -5,6 +5,7 @@ import logging
 import boto
 import iam
 import ec2
+import vpc as vpc_pkg
 import core
 
 logger = logging.getLogger(__name__)
@@ -106,6 +107,9 @@ def create_nat_instance(vpc, public_subnet, private_subnet, security_groups=None
     # Connect to the Amazon Elastic Compute Cloud (Amazon EC2) service.
     ec2_connection = connect_ec2()
 
+    # Connect to the Amazon Virtual Private Cloud (Amazon VPC) service.
+    vpc_connection = vpc_pkg.connect_vpc()
+
     if not security_groups:
         security_groups = [create_security_group(vpc, name='nat-sg'
                                                     , allowed_inbound_traffic=[('HTTP',   private_subnet.cidr_block)
@@ -118,12 +122,41 @@ def create_nat_instance(vpc, public_subnet, private_subnet, security_groups=None
         image_id = get_nat_image()
 
     # Create NAT Instance.
-    instance = create_ec2_instance(public_subnet, name='ec2-nat', security_groups=security_groups, image_id=image_id.id)[0]
+    nat_instance = create_ec2_instance(public_subnet, name='ec2-nat', security_groups=security_groups, image_id=image_id.id)[0]
 
     # Disable source/destination checking.
-    ec2_connection.modify_instance_attribute(instance.id, attribute='sourceDestCheck', value=False, dry_run=False)
+    ec2_connection.modify_instance_attribute(nat_instance.id, attribute='sourceDestCheck', value=False, dry_run=False)
 
-    return instance
+    # Create Route table.
+    route_table = vpc_pkg.create_route_table(vpc, name='test', internet_access=False)
+
+    # Wait for NAT instance to run.
+    while (not nat_instance.state == 'running'):
+        time.sleep(1)
+        nat_instance.update()
+
+    # Add route to NAT Instance to Route Table.
+    vpc_connection.create_route(route_table.id,    # route_table_id
+                                '0.0.0.0/0',       # destination_cidr_block
+                                gateway_id=None,
+                                instance_id=nat_instance.id,
+                                interface_id=None,
+                                vpc_peering_connection_id=None,
+                                dry_run=False)
+
+    # Associate Private Subnet to Route Table.
+    private_subnet.association_id = vpc_connection.replace_route_table_association_with_assoc(private_subnet.association_id, # association_id
+                                                                                              route_table.id,                # route_table_id
+                                                                                              dry_run=False)
+    #association = vpc_connection.associate_route_table(route_table.id,    # route_table_id
+    #                                                   private_subnet.id, # subnet_id
+    #                                                   dry_run=False)
+    if len(private_subnet.association_id):
+        logger.debug('Subnet (%s) associated to (%s).' % (private_subnet.id, route_table.name))
+    else:
+        logger.error('Subnet (%s) not associated to (%s).' % (private_subnet.id, route_table.name))
+
+    return nat_instance
 
 def create_ec2_instances(vpc, subnets, security_groups=None, script=None, instance_profile=None, os='ubuntu', image_id=None):
     # Create a security group, if a security group was not specified.

@@ -184,7 +184,7 @@ def attach_internet_gateway(vpc):
 
     return internet_gateway
 
-def create_route_table(vpc, internet_access=False):
+def create_route_table(vpc, name=None, internet_access=False):
     # Connect to the Amazon Virtual Private Cloud (Amazon VPC) service.
     vpc_connection = connect_vpc()
 
@@ -203,7 +203,7 @@ def create_route_table(vpc, internet_access=False):
         else:
             internet_gateway = attach_internet_gateway(vpc)
 
-        # Add route to Internet to default Route Table.
+        # Add route to Internet to Route Table.
         vpc_connection.create_route(route_table.id,    # route_table_id
                                     '0.0.0.0/0',       # destination_cidr_block
                                     gateway_id=internet_gateway.id,
@@ -220,18 +220,20 @@ def create_route_table(vpc, internet_access=False):
     public_route_tables = vpc_connection.get_all_route_tables(filters={'vpc-id': vpc.id,
                                                                        'route.destination-cidr-block': '0.0.0.0/0'})
     suffix = str(len(public_route_tables) if internet_access else len(route_tables)-len(public_route_tables)-1)
-    route_table_name = '-'.join(['rtb', \
-                                 core.PROJECT_NAME.lower(), \
-                                 core.args.environment.lower(), \
-                                 'public' if internet_access else 'private', \
-                                 suffix])
-    route_table.name = route_table_name
+
+    if not name:
+        name = '-'.join(['rtb', \
+                         core.PROJECT_NAME.lower(), \
+                         core.args.environment.lower(), \
+                         'public' if internet_access else 'private', \
+                         suffix])
+    route_table.name = name
 
     # Tag Route Table.
     tagged = False
     while not tagged:
         try:
-            tagged = ec2_connection.create_tags([route_table.id], {'Name': route_table_name,
+            tagged = ec2_connection.create_tags([route_table.id], {'Name': route_table.name,
                                                                    'Project': core.PROJECT_NAME.lower(),
                                                                    'Environment': core.args.environment.lower(),
                                                                    'Type': 'public' if internet_access else 'private',})
@@ -363,13 +365,15 @@ def create_subnet(vpc, zone, cidr_block, subnet_name=None, route_table=None):
     # Associate Subnet to Route Table.
     public = False
     if route_table:
-        association = vpc_connection.associate_route_table(route_table.id, # route_table_id
-                                                           subnet.id,      # subnet_id
-                                                           dry_run=False)
-        if len(association):
-            logger.debug('Subnet (%s) associated to (%s).' % (subnet_name, route_table.name))
+        association_id = vpc_connection.associate_route_table(route_table.id, # route_table_id
+                                                              subnet.id,      # subnet_id
+                                                              dry_run=False)
+        if len(association_id):
+            subnet.association_id = association_id
+            logger.debug('Subnet (%s) associated to (%s).' % (subnet_name, route_table.id))
         else:
-            logger.error('Subnet (%s) not associated to (%s).' % (subnet_name, route_table.name))
+            subnet.association_id = None
+            logger.error('Subnet (%s) not associated to (%s).' % (subnet_name, route_table.id))
 
         # Determine Subnet type.
         public = [route for route in route_table.routes if route.gateway_id and route.destination_cidr_block == '0.0.0.0/0']
