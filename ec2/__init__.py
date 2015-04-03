@@ -232,7 +232,7 @@ def create_nat_instance(vpc, public_subnet, private_subnet, name=None, security_
 
     return nat_instance
 
-def create_ec2_instances(vpc, subnets, role=None, security_groups=None, script=None, instance_profile=None, os='ubuntu', image_id=None):
+def create_ec2_instances(vpc, subnets, role=None, security_groups=None, script=None, instance_profile=None, os='ubuntu', image_id=None, internet_addressable=False):
     # Create a security group, if a security group was not specified.
     if not security_groups:
         security_groups = [create_security_group(vpc, allowed_inbound_traffic=[('HTTP',   '0.0.0.0/0')
@@ -244,11 +244,11 @@ def create_ec2_instances(vpc, subnets, role=None, security_groups=None, script=N
     # Create EC2 instances.
     instances = list()
     for subnet in subnets:
-        instance = create_ec2_instance(subnet, role=role, security_groups=security_groups, script=script, instance_profile=instance_profile, os=os, image_id=image_id)
+        instance = create_ec2_instance(subnet, role=role, security_groups=security_groups, script=script, instance_profile=instance_profile, os=os, image_id=image_id, internet_addressable=internet_addressable)
         instances = instances + instance
     return instances
 
-def create_ec2_instance(subnet, name=None, role=None, security_groups=None, script=None, instance_profile=None, os='ubuntu', image_id=None):
+def create_ec2_instance(subnet, name=None, role=None, security_groups=None, script=None, instance_profile=None, os='ubuntu', image_id=None, internet_addressable=False):
     # Set up dictionary of OSes and their associated quick-start Amazon Machine Images (AMIs).
     ami = {
         'amazon-linux': 'ami-146e2a7c',
@@ -279,7 +279,7 @@ def create_ec2_instance(subnet, name=None, role=None, security_groups=None, scri
     # Create Elastic Network Interface (ENI) specification.
     interface = boto.ec2.networkinterface.NetworkInterfaceSpecification(subnet_id=subnet.id,
                                                                         groups=[security_group.id for security_group in security_groups],
-                                                                        associate_public_ip_address=True)
+                                                                        associate_public_ip_address=internet_addressable)
     interfaces = boto.ec2.networkinterface.NetworkInterfaceCollection(interface)
 
     # Create EC2 Reservation.
