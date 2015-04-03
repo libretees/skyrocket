@@ -301,7 +301,7 @@ def create_ec2_instance(subnet, name=None, role=None, security_groups=None, scri
             tagged = ec2_connection.create_tags([instance.id for instance in instances], {'Name': name,
                                                                                           'Project': core.PROJECT_NAME.lower(),
                                                                                           'Environment': core.args.environment.lower(),
-                                                                                          'Role': role,})
+                                                                                          'Role': role if role else '',})
         except boto.exception.EC2ResponseError as error:
             if error.code == 'InvalidInstanceID.NotFound': # Instance hasn't registered with EC2 service yet.
                 pass
