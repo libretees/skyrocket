@@ -35,12 +35,16 @@ def main():
         sys.exit(1)
 
     public_vpc = vpc.create_vpc(cidr_block, internet_connected=True)
-    public_subnets = vpc.create_subnets(public_vpc, zones='us-east-1b', byte_aligned=True, public=True)
-    private_subnets = vpc.create_subnets(public_vpc, zones='us-east-1b', byte_aligned=True)
+    public_subnets = vpc.create_subnets(public_vpc, zones=['us-east-1b', 'us-east-1c'], byte_aligned=True, public=True)
+    private_subnets = vpc.create_subnets(public_vpc, zones=['us-east-1b', 'us-east-1c'], byte_aligned=True)
 
+    instances = ec2.create_ec2_instances(public_vpc, public_subnets, role='application')
     nat_instances = ec2.create_nat_instances(public_vpc, public_subnets, private_subnets)
 
-    #instances = ec2.create_ec2_instances(public_vpc, public_subnets)
+    for instance in instances:
+        print('group:', instance.groups)
+
+    database = rds.create_database(public_vpc, private_subnets, publicly_accessible=False, multi_az=True)
 
     #db_subnet_group = rds.create_db_subnet_group(private_subnets)
 
@@ -85,14 +89,9 @@ def main():
     # curl http://169.254.169.254/latest/meta-data/iam/security-credentials/myrole
     # aws s3 cp --region us-east-1 s3://s3-gossamer-staging-faddde2b/gossamer.tar.gz gossamer.tar.gz
 
-    # pg = rds.create_db_parameter_group(rds_connection)
-
-    # db = rds.create_db_instance(rds_connection,
-    #                             pg,
-    #                             subnet)
-
-    # rs = rds_connection.describe_db_instances()
-    # print(type(rs), rs)
+    rds_connection = rds.connect_rds()
+    rs = rds_connection.describe_db_instances()
+    print(type(rs), rs)
 
 if __name__ == '__main__':
     main()

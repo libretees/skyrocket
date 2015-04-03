@@ -48,7 +48,7 @@ def create_security_group(vpc, name=None, allowed_inbound_traffic=None, allowed_
 
         # Determine port range for TCP and UDP rules.
         if protocol[:3] in ['TCP', 'UDP']:
-            port = protocol.split(':')
+            port = protocol.split(':')[-1]
             if re.search(r'^\d+\-\d+$', port):
                 from_port, to_port = itemgetter(0, 1)(protocol.split('-'))
             else:
