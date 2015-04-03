@@ -2,6 +2,7 @@ import re
 import time
 import random
 import logging
+from operator import itemgetter
 import boto
 import iam
 import ec2
@@ -45,23 +46,39 @@ def create_security_group(vpc, name=None, allowed_inbound_traffic=None, allowed_
         target_cidr_ip = target if is_cidr_ip else None
         target_group = target if not is_cidr_ip else None
 
+        # Determine port range for TCP and UDP rules.
+        if protocol[:3] in ['TCP', 'UDP']:
+            port = protocol.split(':')
+            if re.search(r'^\d+\-\d+$', port):
+                from_port, to_port = itemgetter(0, 1)(protocol.split('-'))
+            else:
+                from_port, to_port = port, port
+
         # Create inbound rules.
         if rule_type == 'inbound':
             if protocol == 'HTTP':
                 security_group.authorize(ip_protocol='tcp', from_port=80, to_port=80, src_group=target_group, cidr_ip=target_cidr_ip)
-            if protocol == 'HTTPS':
+            elif protocol == 'HTTPS':
                 security_group.authorize(ip_protocol='tcp', from_port=443, to_port=443, src_group=target_group, cidr_ip=target_cidr_ip)
+            elif protocol == 'TCP':
+                security_group.authorize(ip_protocol='tcp', from_port=int(from_port), to_port=int(to_port), src_group=target_group, cidr_ip=target_cidr_ip)
+            elif protocol == 'UDP':
+                security_group.authorize(ip_protocol='udp', from_port=int(from_port), to_port=int(to_port), src_group=target_group, cidr_ip=target_cidr_ip)
             logger.info('Security Group (%s) allowed inbound %s traffic from %s.' % (name, protocol, target))
 
         # Create outbound rules.
         if rule_type == 'outbound':
             if protocol == 'HTTP':
                 ec2_connection.authorize_security_group_egress(security_group.id, 'tcp', from_port=80, to_port=80, src_group_id=target_group, cidr_ip=target_cidr_ip)
-            if protocol == 'HTTPS':
+            elif protocol == 'HTTPS':
                 ec2_connection.authorize_security_group_egress(security_group.id, 'tcp', from_port=443, to_port=443, src_group_id=target_group, cidr_ip=target_cidr_ip)
-            if protocol == 'DNS':
+            elif protocol == 'DNS':
                 ec2_connection.authorize_security_group_egress(security_group.id, 'tcp', from_port=53, to_port=53, src_group_id=target_group, cidr_ip=target_cidr_ip)
                 ec2_connection.authorize_security_group_egress(security_group.id, 'udp', from_port=53, to_port=53, src_group_id=target_group, cidr_ip=target_cidr_ip)
+            elif protocol == 'TCP':
+                 ec2_connection.authorize_security_group_egress(security_group.id, 'tcp', from_port=int(from_port), to_port=int(to_port), src_group_id=target_group, cidr_ip=target_cidr_ip)
+            elif protocol == 'UDP':
+                 ec2_connection.authorize_security_group_egress(security_group.id, 'udp', from_port=int(from_port), to_port=int(to_port), src_group_id=target_group, cidr_ip=target_cidr_ip)
             logger.info('Security Group (%s) allowed outbound %s traffic to %s.' % (name, protocol, target))
 
     # Tag Security Group.
