@@ -19,13 +19,19 @@ def connect_ec2():
 
     return ec2
 
-def create_security_group(vpc, name=None, allowed_inbound_traffic=[], allowed_outbound_traffic=[]):
+def create_security_group(vpc, name=None, allowed_inbound_traffic=None, allowed_outbound_traffic=None):
     # Connect to the Amazon Elastic Compute Cloud (Amazon EC2) service.
     ec2_connection = connect_ec2()
 
     # Generate Security Group name.
     if not name:
         name = '-'.join(['gp', core.PROJECT_NAME.lower(), core.args.environment.lower()])
+
+    if not allowed_inbound_traffic:
+        allowed_inbound_traffic = []
+
+    if not allowed_outbound_traffic:
+        allowed_outbound_traffic = []
 
     # Create Security Group.
     logger.info('Creating Security Group (%s).' % name)
@@ -38,15 +44,16 @@ def create_security_group(vpc, name=None, allowed_inbound_traffic=[], allowed_ou
                                          [(traffic[0].upper(), traffic[1], 'outbound') for traffic in allowed_outbound_traffic]:
 
         # Determine whether target is a CIDR block or a Security Group.
-        is_cidr_ip = re.search('^(25[0-5]|2[0-4]\d|1\d\d|[1-9]?\d)\.'+ # A in A.B.C.D
-                               '(25[0-5]|2[0-4]\d|1\d\d|[1-9]?\d)\.' + # B in A.B.C.D
-                               '(25[0-5]|2[0-4]\d|1\d\d|[1-9]?\d)\.' + # C in A.B.C.D
-                               '(25[0-5]|2[0-4]\d|1\d\d|[1-9]?\d)'   + # D in A.B.C.D
-                               '(/(([1-2]?[0-9])|(3[0-2])))$', target) # /0 through /32
+        is_cidr_ip = re.search('^(25[0-5]|2[0-4]\d|1\d\d|[1-9]?\d)\.'+      # A in A.B.C.D
+                               '(25[0-5]|2[0-4]\d|1\d\d|[1-9]?\d)\.' +      # B in A.B.C.D
+                               '(25[0-5]|2[0-4]\d|1\d\d|[1-9]?\d)\.' +      # C in A.B.C.D
+                               '(25[0-5]|2[0-4]\d|1\d\d|[1-9]?\d)'   +      # D in A.B.C.D
+                               '(/(([1-2]?[0-9])|(3[0-2])))$', str(target)) # /0 through /32
         target_cidr_ip = target if is_cidr_ip else None
-        target_group = target if not is_cidr_ip else None
+        target_group = ec2_connection.get_all_security_groups(group_ids=[target])[-1] if not is_cidr_ip else None
 
         # Determine port range for TCP and UDP rules.
+        port = None
         if protocol[:3] in ['TCP', 'UDP']:
             protocol, port = itemgetter(0, 1)(protocol.split(':'))
             if re.search(r'^\d+\-\d+$', port):
@@ -64,7 +71,7 @@ def create_security_group(vpc, name=None, allowed_inbound_traffic=[], allowed_ou
                 security_group.authorize(ip_protocol='tcp', from_port=int(from_port), to_port=int(to_port), src_group=target_group, cidr_ip=target_cidr_ip)
             elif protocol == 'UDP':
                 security_group.authorize(ip_protocol='udp', from_port=int(from_port), to_port=int(to_port), src_group=target_group, cidr_ip=target_cidr_ip)
-            logger.info('Security Group (%s) allowed inbound %s traffic from %s.' % (name, protocol, target))
+            logger.info('Security Group (%s) allowed inbound %s traffic from %s.' % (name, protocol + (' Port %s' % port if port else ''), target))
 
         # Create outbound rules.
         if rule_type == 'outbound':
@@ -79,7 +86,7 @@ def create_security_group(vpc, name=None, allowed_inbound_traffic=[], allowed_ou
                  ec2_connection.authorize_security_group_egress(security_group.id, 'tcp', from_port=int(from_port), to_port=int(to_port), src_group_id=target_group, cidr_ip=target_cidr_ip)
             elif protocol == 'UDP':
                  ec2_connection.authorize_security_group_egress(security_group.id, 'udp', from_port=int(from_port), to_port=int(to_port), src_group_id=target_group, cidr_ip=target_cidr_ip)
-            logger.info('Security Group (%s) allowed outbound %s traffic to %s.' % (name, protocol, target))
+            logger.info('Security Group (%s) allowed inbound %s traffic from %s.' % (name, protocol + (' Port %s' % port if port else ''), target))
 
     # Tag Security Group.
     tagged = False
@@ -174,7 +181,7 @@ def create_nat_instance(vpc, public_subnet, private_subnet, name=None, security_
         name = '-'.join(['ec2', core.PROJECT_NAME.lower(), core.args.environment.lower(), public_subnet.availability_zone, 'nat'])
 
     # Create NAT Instance.
-    nat_instance = create_ec2_instance(public_subnet, name=name, role='nat', security_groups=security_groups, image_id=image_id.id)[0]
+    nat_instance = create_ec2_instance(public_subnet, name=name, role='nat', security_groups=security_groups, image_id=image_id.id, internet_addressable=True)[0]
 
     # Disable source/destination checking.
     ec2_connection.modify_instance_attribute(nat_instance.id, attribute='sourceDestCheck', value=False, dry_run=False)
