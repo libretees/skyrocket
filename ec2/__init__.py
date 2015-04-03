@@ -19,7 +19,7 @@ def connect_ec2():
 
     return ec2
 
-def create_security_group(vpc, name=None, allowed_inbound_traffic=None, allowed_outbound_traffic=None):
+def create_security_group(vpc, name=None, allowed_inbound_traffic=[], allowed_outbound_traffic=[]):
     # Connect to the Amazon Elastic Compute Cloud (Amazon EC2) service.
     ec2_connection = connect_ec2()
 
