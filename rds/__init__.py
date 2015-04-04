@@ -62,7 +62,7 @@ def create_db_subnet_group(subnets):
                                                    [subnet.id for subnet in subnets])   #subnet_ids
     return subnet
 
-def create_database(vpc, subnets, security_groups=None, publicly_accessible=False, multi_az=False, db_parameter_group=None):
+def create_database(vpc, subnets, application_instances=None, security_groups=None, publicly_accessible=False, multi_az=False, db_parameter_group=None):
     # Connect to the Amazon Relational Database Service (Amazon RDS).
     rds_connection = connect_rds()
 
@@ -103,9 +103,17 @@ def create_database(vpc, subnets, security_groups=None, publicly_accessible=Fals
     }
 
     if not security_groups:
+        if application_instances:
+            # Create rule(s) allowing traffic from application server security group(s).
+            application_security_group_ids = set([group.id for instance in application_instances for group in instance.groups])
+            inbound_rules = list()
+            for application_security_group_id in application_security_group_ids:
+                inbound_rule = ('TCP:' + str(inbound_port[DJANGO_ENGINE]), application_security_group_id)
+                inbound_rules.append(inbound_rule)
+
         sg_name = '-'.join(['gp', core.PROJECT_NAME.lower(), core.args.environment.lower(), 'db'])
         security_groups = [ec2.create_security_group(vpc, name=sg_name
-                                                        , allowed_inbound_traffic=[('TCP:' + str(inbound_port[DJANGO_ENGINE]), '0.0.0.0/0')]
+                                                        , allowed_inbound_traffic=inbound_rules if application_instances else None
                                                         , allowed_outbound_traffic=[('HTTP',  '0.0.0.0/0')
                                                                                    ,('HTTPS', '0.0.0.0/0')
                                                                                    ,('DNS',   '0.0.0.0/0')])]

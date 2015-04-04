@@ -38,15 +38,10 @@ def main():
     public_subnets = vpc.create_subnets(public_vpc, zones=['us-east-1b', 'us-east-1c'], byte_aligned=True, public=True)
     private_subnets = vpc.create_subnets(public_vpc, zones=['us-east-1b', 'us-east-1c'], byte_aligned=True)
 
-    instances = ec2.create_ec2_instances(public_vpc, public_subnets, role='application')
+    instances = ec2.create_ec2_instances(public_vpc, public_subnets, role='application', internet_addressable=True)
     nat_instances = ec2.create_nat_instances(public_vpc, public_subnets, private_subnets)
 
-    for instance in instances:
-        print('group:', instance.groups)
-
-    database = rds.create_database(public_vpc, private_subnets, publicly_accessible=False, multi_az=True)
-
-    #db_subnet_group = rds.create_db_subnet_group(private_subnets)
+    database = rds.create_database(public_vpc, private_subnets, application_instances=instances, publicly_accessible=False, multi_az=True)
 
     # archive_name = '.'.join([s3.PROJECT_NAME, 'tar', 'gz'])
     # logger.info('Creating deployment archive (%s).' % archive_name)
@@ -62,9 +57,7 @@ def main():
     # policy = s3.get_bucket_policy(bucket)
 
     # cert_arn = iam.upload_ssl_certificate()
-
     # sg = ec2.create_security_group(public_vpc)
-
     # load_balancer = ec2.create_elb(sg, public_subnets, cert_arn)
 
     # script = get_script('us-east-1', bucket.name, archive_name, bootstrap_archive_name)
