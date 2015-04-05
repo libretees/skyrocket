@@ -191,8 +191,7 @@ def create_nat_instance(vpc, public_subnet, private_subnet, name=None, security_
     route_table = vpc_pkg.create_route_table(vpc, name=route_table_name, internet_access=False)
 
     # Wait for NAT instance to run.
-    logger.info('Waiting for NAT instance to run (%s)...' % nat_instance.id)
-    while (not nat_instance.state == 'running'):
+    while (nat_instance.state == 'pending'):
         logger.debug('Waiting for NAT instance to run (%s)...' % nat_instance.id)
         time.sleep(1)
         nat_instance.update()
