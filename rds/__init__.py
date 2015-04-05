@@ -4,6 +4,8 @@ import boto
 import ec2
 import core
 
+AWS_ACCOUNT_ID = core.args.account_id
+
 PROJECT_NAME = core.PROJECT_NAME
 DJANGO_ENGINE = core.settings.DATABASES['default']['ENGINE']
 
@@ -143,5 +145,18 @@ def create_database(vpc, subnets, application_instances=None, security_groups=No
                                                     character_set_name=None,
                                                     publicly_accessible=publicly_accessible,
                                                     tags=None)
+
+    # Construct Database Instance ARN.
+    dbinstance_name = 'dbinst1'
+    region = 'us-east-1'
+    database_arn = 'arn:aws:rds:%s:%s:db:%s' % (region, AWS_ACCOUNT_ID, dbinstance_name)
+
+    # Tag Database Instance.
+    logger.debug('Tagging Database instance (%s).' % database_arn)
+    rds_connection.add_tags_to_resource(database_arn,                                     # resource_name
+                                        [('Name'       , dbinstance_name              ),  # tags
+                                         ('Project'    , core.PROJECT_NAME.lower()    ),
+                                         ('Environment', core.args.environment.lower())])
+    logger.debug('Tagged Database instance (%s).' % database_arn)
 
     return db_instance
