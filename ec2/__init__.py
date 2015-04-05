@@ -86,7 +86,7 @@ def create_security_group(vpc, name=None, allowed_inbound_traffic=None, allowed_
                  ec2_connection.authorize_security_group_egress(security_group.id, 'tcp', from_port=int(from_port), to_port=int(to_port), src_group_id=target_group, cidr_ip=target_cidr_ip)
             elif protocol == 'UDP':
                  ec2_connection.authorize_security_group_egress(security_group.id, 'udp', from_port=int(from_port), to_port=int(to_port), src_group_id=target_group, cidr_ip=target_cidr_ip)
-            logger.info('Security Group (%s) allowed inbound %s traffic from %s.' % (name, protocol + (' Port %s' % port if port else ''), target))
+            logger.info('Security Group (%s) allowed outbound %s traffic to %s.' % (name, protocol + (' Port %s' % port if port else ''), target))
 
     # Tag Security Group.
     tagged = False
