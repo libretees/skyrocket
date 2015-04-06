@@ -47,7 +47,7 @@ def create_db_subnet_group(subnets):
     rds_connection = connect_rds()
 
     # Generate DB Subnet Group name.
-    db_subnet_group_name = '-'.join(['dbsubnet',
+    db_subnet_group_name = '-'.join(['subgrp',
                                      PROJECT_NAME.lower(),
                                      core.args.environment.lower(),])
 
