@@ -42,26 +42,40 @@ def create_db_parameter_group():
                                                                   description=' '.join([PROJECT_NAME, 'Parameter Group'])) #description
     return db_parameter_group
 
-def create_db_subnet_group(subnets):
+def create_db_subnet_group(subnets, name=None):
     # Connect to the Amazon Relational Database Service (Amazon RDS).
     rds_connection = connect_rds()
 
     # Generate DB Subnet Group name.
-    db_subnet_group_name = '-'.join(['subgrp',
-                                     PROJECT_NAME.lower(),
-                                     core.args.environment.lower(),])
+    if not name:
+        name = '-'.join(['subgrp',
+                         PROJECT_NAME.lower(),
+                         core.args.environment.lower(),])
 
     # Delte existing DB Subnet Group.
     try:
-        rds_connection.delete_db_subnet_group(db_subnet_group_name)
+        rds_connection.delete_db_subnet_group(name)
     except boto.exception.JSONResponseError as error:
         if error.code == 'DBSubnetGroupNotFoundFault':
             pass
 
-    # Create DB Subnet Group.
-    subnet = rds_connection.create_db_subnet_group(db_subnet_group_name,                        #db_subnet_group_name
+    # Create Database Subnet Group.
+    subnet = rds_connection.create_db_subnet_group(name,                                        #db_subnet_group_name
                                                    ' '.join([PROJECT_NAME, 'DB Subnet Group']), #db_subnet_group_description
-                                                   [subnet.id for subnet in subnets])   #subnet_ids
+                                                   [subnet.id for subnet in subnets])           #subnet_ids
+
+    # Construct Database Subnet Group ARN.
+    region = 'us-east-1'
+    db_subnet_group_arn = 'arn:aws:rds:%s:%s:subgrp:%s' % (region, AWS_ACCOUNT_ID, name)
+
+    # Tag Database Subnet Group.
+    logger.debug('Tagging Database instance (%s).' % db_subnet_group_arn)
+    rds_connection.add_tags_to_resource(db_subnet_group_arn,                              # resource_name
+                                        [('Name'       , name                         ),  # tags
+                                         ('Project'    , core.PROJECT_NAME.lower()    ),
+                                         ('Environment', core.args.environment.lower())])
+    logger.debug('Tagged Database instance (%s).' % db_subnet_group_arn)
+
     return subnet
 
 def create_database(vpc, subnets, application_instances=None, security_groups=None, publicly_accessible=False, multi_az=False, db_parameter_group=None):
