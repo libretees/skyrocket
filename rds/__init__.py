@@ -19,7 +19,7 @@ def connect_rds():
     
     return rds
 
-def create_db_parameter_group():
+def create_db_parameter_group(name=None):
     # Connect to the Amazon Relational Database Service (Amazon RDS).
     rds_connection = connect_rds()
 
@@ -29,6 +29,7 @@ def create_db_parameter_group():
         'django.db.backends.mysql':               'MySQL5.6',
         'django.db.backends.oracle':              'oracle-se1-11.2',
     }
+
     db_parameter_group_name = '-'.join(['pg', PROJECT_NAME.lower(), core.args.environment.lower(), 'db'])
 
     # Delete existing DB Parameter Group.
@@ -40,6 +41,19 @@ def create_db_parameter_group():
     db_parameter_group = rds_connection.create_db_parameter_group(db_parameter_group_name,                                 #db_parameter_group_name
                                                                   aws_engine[DJANGO_ENGINE],                               #db_parameter_group_family
                                                                   description=' '.join([PROJECT_NAME, 'Parameter Group'])) #description
+
+    # Construct Database Parameter Group ARN.
+    region = 'us-east-1'
+    db_parameter_group_arn = 'arn:aws:rds:%s:%s:pg:%s' % (region, AWS_ACCOUNT_ID, name)
+
+    # Tag Database Subnet Group.
+    logger.debug('Tagging Database instance (%s).' % db_parameter_group_arn)
+    rds_connection.add_tags_to_resource(db_parameter_group_arn,                           # resource_name
+                                        [('Name'       , name                         ),  # tags
+                                         ('Project'    , core.PROJECT_NAME.lower()    ),
+                                         ('Environment', core.args.environment.lower())])
+    logger.debug('Tagged Database instance (%s).' % db_parameter_group_arn)
+
     return db_parameter_group
 
 def create_db_subnet_group(subnets, name=None):
