@@ -30,29 +30,33 @@ def create_db_parameter_group(name=None):
         'django.db.backends.oracle':              'oracle-se1-11.2',
     }
 
-    db_parameter_group_name = '-'.join(['pg', PROJECT_NAME.lower(), core.args.environment.lower(), 'db'])
+    # Generate Database Parameter Group name.
+    if not name:
+        name = '-'.join(['pg',
+                         PROJECT_NAME.lower(),
+                         core.args.environment.lower(),])
 
-    # Delete existing DB Parameter Group.
+    # Delete existing Database Parameter Group.
     try:
-        rds_connection.delete_db_parameter_group(db_parameter_group_name)
+        rds_connection.delete_db_parameter_group(name)
     except boto.rds2.exceptions.DBParameterGroupNotFound as error:
         pass
 
-    db_parameter_group = rds_connection.create_db_parameter_group(db_parameter_group_name,                                 #db_parameter_group_name
-                                                                  aws_engine[DJANGO_ENGINE],                               #db_parameter_group_family
-                                                                  description=' '.join([PROJECT_NAME, 'Parameter Group'])) #description
+    db_parameter_group = rds_connection.create_db_parameter_group(name,                                                    # db_parameter_group_name
+                                                                  aws_engine[DJANGO_ENGINE],                               # db_parameter_group_family
+                                                                  description=' '.join([PROJECT_NAME, 'Parameter Group'])) # description
 
     # Construct Database Parameter Group ARN.
     region = 'us-east-1'
     db_parameter_group_arn = 'arn:aws:rds:%s:%s:pg:%s' % (region, AWS_ACCOUNT_ID, name)
 
     # Tag Database Subnet Group.
-    logger.debug('Tagging Database instance (%s).' % db_parameter_group_arn)
+    logger.debug('Tagging Amazon RDS Resource (%s).' % db_parameter_group_arn)
     rds_connection.add_tags_to_resource(db_parameter_group_arn,                           # resource_name
                                         [('Name'       , name                         ),  # tags
                                          ('Project'    , core.PROJECT_NAME.lower()    ),
                                          ('Environment', core.args.environment.lower())])
-    logger.debug('Tagged Database instance (%s).' % db_parameter_group_arn)
+    logger.debug('Tagged Amazon RDS Resource (%s).' % db_parameter_group_arn)
 
     return db_parameter_group
 
@@ -60,13 +64,13 @@ def create_db_subnet_group(subnets, name=None):
     # Connect to the Amazon Relational Database Service (Amazon RDS).
     rds_connection = connect_rds()
 
-    # Generate DB Subnet Group name.
+    # Generate Database Subnet Group name.
     if not name:
         name = '-'.join(['subgrp',
                          PROJECT_NAME.lower(),
                          core.args.environment.lower(),])
 
-    # Delte existing DB Subnet Group.
+    # Delte existing Database Subnet Group.
     try:
         rds_connection.delete_db_subnet_group(name)
     except boto.exception.JSONResponseError as error:
@@ -83,14 +87,64 @@ def create_db_subnet_group(subnets, name=None):
     db_subnet_group_arn = 'arn:aws:rds:%s:%s:subgrp:%s' % (region, AWS_ACCOUNT_ID, name)
 
     # Tag Database Subnet Group.
-    logger.debug('Tagging Database instance (%s).' % db_subnet_group_arn)
+    logger.debug('Tagging Amazon RDS Resource (%s).' % db_subnet_group_arn)
     rds_connection.add_tags_to_resource(db_subnet_group_arn,                              # resource_name
                                         [('Name'       , name                         ),  # tags
                                          ('Project'    , core.PROJECT_NAME.lower()    ),
                                          ('Environment', core.args.environment.lower())])
-    logger.debug('Tagged Database instance (%s).' % db_subnet_group_arn)
+    logger.debug('Tagged Amazon RDS Resource (%s).' % db_subnet_group_arn)
 
     return subnet
+
+def create_option_group(name=None):
+    # Connect to the Amazon Relational Database Service (Amazon RDS).
+    rds_connection = connect_rds()
+
+    # Generate Option Group name.
+    if not name:
+        name = '-'.join(['og',
+                         PROJECT_NAME.lower(),
+                         core.args.environment.lower(),])
+
+    engine_name = {
+        'django.db.backends.postgresql_psycopg2': 'postgres',
+        'django.db.backends.mysql':               'MySQL',
+        'django.db.backends.oracle':              'oracle-se1',
+    }
+
+    major_engine_version = {
+        'django.db.backends.postgresql_psycopg2': '9.3',
+        'django.db.backends.mysql':               '5.1.42',
+        'django.db.backends.oracle':              '11.2.0.2.v2',
+    }
+
+    # Delete Option Group.
+    try:
+        rds_connection.delete_option_group(name)
+    except boto.exception.JSONResponseError as error:
+        if error.code == 'OptionGroupNotFoundFault':
+            pass
+
+    # Create Option Group.
+    option_group = rds_connection.create_option_group(name,                                     # option_group_name
+                                                      engine_name[DJANGO_ENGINE],               # engine_name
+                                                      major_engine_version[DJANGO_ENGINE],      # major_engine_version
+                                                      ' '.join([PROJECT_NAME, 'Option Group']), # option_group_description
+                                                      tags=None)
+
+    # Construct Option Group ARN.
+    region = 'us-east-1'
+    option_group_arn = 'arn:aws:rds:%s:%s:og:%s' % (region, AWS_ACCOUNT_ID, name)
+
+    # Tag Option Group.
+    logger.debug('Tagging Amazon RDS Resource (%s).' % option_group_arn)
+    rds_connection.add_tags_to_resource(option_group_arn   ,                              # resource_name
+                                        [('Name'       , name                         ),  # tags
+                                         ('Project'    , core.PROJECT_NAME.lower()    ),
+                                         ('Environment', core.args.environment.lower())])
+    logger.debug('Tagged Amazon RDS Resource (%s).' % option_group_arn)
+
+    return option_group
 
 def create_database(vpc, subnets, application_instances=None, security_groups=None, publicly_accessible=False, multi_az=False, db_parameter_group=None):
     # Connect to the Amazon Relational Database Service (Amazon RDS).
@@ -116,6 +170,8 @@ def create_database(vpc, subnets, application_instances=None, security_groups=No
 
     db_subnet_group = create_db_subnet_group(subnets)
 
+    option_group = create_option_group()
+
     db_parameter_group_name = db_parameter_group['CreateDBParameterGroupResponse']\
                                                 ['CreateDBParameterGroupResult']\
                                                 ['DBParameterGroup']\
@@ -125,6 +181,11 @@ def create_database(vpc, subnets, application_instances=None, security_groups=No
                                           ['CreateDBSubnetGroupResult']\
                                           ['DBSubnetGroup']\
                                           ['DBSubnetGroupName']
+
+    option_group_name = option_group['CreateOptionGroupResponse']\
+                                    ['CreateOptionGroupResult']\
+                                    ['OptionGroup']\
+                                    ['OptionGroupName']
 
     inbound_port = {
         'django.db.backends.postgresql_psycopg2': 5432,
@@ -169,7 +230,7 @@ def create_database(vpc, subnets, application_instances=None, security_groups=No
                                                     auto_minor_version_upgrade=None,
                                                     license_model=None,
                                                     iops=None,
-                                                    option_group_name=None,
+                                                    option_group_name=option_group_name,
                                                     character_set_name=None,
                                                     publicly_accessible=publicly_accessible,
                                                     tags=None)
@@ -180,11 +241,11 @@ def create_database(vpc, subnets, application_instances=None, security_groups=No
     database_arn = 'arn:aws:rds:%s:%s:db:%s' % (region, AWS_ACCOUNT_ID, dbinstance_name)
 
     # Tag Database Instance.
-    logger.debug('Tagging Database instance (%s).' % database_arn)
+    logger.debug('Tagging Amazon RDS Resource (%s).' % database_arn)
     rds_connection.add_tags_to_resource(database_arn,                                     # resource_name
                                         [('Name'       , dbinstance_name              ),  # tags
                                          ('Project'    , core.PROJECT_NAME.lower()    ),
                                          ('Environment', core.args.environment.lower())])
-    logger.debug('Tagged Database instance (%s).' % database_arn)
+    logger.debug('Tagged Amazon RDS Resource (%s).' % database_arn)
 
     return db_instance
