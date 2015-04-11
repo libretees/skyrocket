@@ -103,7 +103,7 @@ def create_security_group(vpc, name=None, allowed_inbound_traffic=None, allowed_
 
     return security_group
 
-def create_elb(sg, subnets, cert_arn):
+def create_elb(vpc, subnets, name=None, security_groups=None, ssl_certificate=None):
     # Connect to the Amazon EC2 Load Balancing (Amazon ELB) service.
     logger.info('Connecting to the Amazon EC2 Load Balancing (Amazon ELB) service.')
     elb_connection = boto.connect_elb()
@@ -113,30 +113,38 @@ def create_elb(sg, subnets, cert_arn):
     ec2_connection = ec2.connect_ec2()
 
     # Generate Elastic Load Balancer (ELB) name.
-    elb_name = '-'.join(['elb', core.PROJECT_NAME.lower(), core.args.environment.lower()])
+    if not name:
+        name = '-'.join(['elb', core.PROJECT_NAME.lower(), core.args.environment.lower()])
 
     # Delete existing Elastic Load Balancer (ELB).
-    logger.info('Deleting Elastic Load Balancer (%s).' % elb_name)
+    logger.info('Deleting Elastic Load Balancer (%s).' % name)
     try:
-        elb_connection.delete_load_balancer(elb_name)
+        elb_connection.delete_load_balancer(name)
     except boto.exception.BotoServerError as error:
         if error.status == 400: # Bad Request
-            logger.error('Couldn\'t delete Elastic Load Balancer (%s) due to a malformed request %s: %s.' % (elb_name, error.status, error.reason))
+            logger.error('Couldn\'t delete Elastic Load Balancer (%s) due to a malformed request %s: %s.' % (name, error.status, error.reason))
         if error.status == 404: # Not Found
-            logger.error('Elastic Load Balancer (%s) was not found. Error %s: %s.' % (elb_name, error.status, error.reason))
-    logger.info('Deleted Elastic Load Balancer (%s).' % elb_name)
+            logger.error('Elastic Load Balancer (%s) was not found. Error %s: %s.' % (name, error.status, error.reason))
+    logger.info('Deleted Elastic Load Balancer (%s).' % name)
+
+    # Create Security Group.
+    if not security_groups:
+        security_groups = ec2.create_security_group(vpc)
+
+    listeners = [(80, 80, 'HTTP')]
+    if ssl_certificate:
+        listeners.append((443, 443, 'HTTPS', ssl_certificate))
 
     # Create Elastic Load Balancer (ELB).
-    logger.info('Creating Elastic Load Balancer (%s).' % elb_name)
-    load_balancer = elb_connection.create_load_balancer(elb_name, # name
+    logger.info('Creating Elastic Load Balancer (%s).' % name)
+    load_balancer = elb_connection.create_load_balancer(name, # name
                                                         None,     # zones         - Valid only for load balancers in EC2-Classic.
-                                                        listeners=[(80,80,'HTTP'),
-                                                                   (443,443,'HTTPS',cert_arn)],
+                                                        listeners=listeners,
                                                         subnets=[subnet.id for subnet in subnets],
-                                                        security_groups=[sg.id],
+                                                        security_groups=[security_group.id for security_group in security_groups],
                                                         scheme='internet-facing', # Valid only for load balancers in EC2-VPC.
                                                         complex_listeners=None)
-    logger.info('Created Elastic Load Balancer (%s).' % elb_name)
+    logger.info('Created Elastic Load Balancer (%s).' % name)
 
     return load_balancer
 

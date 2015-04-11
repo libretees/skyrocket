@@ -43,6 +43,16 @@ def main():
 
     database = rds.create_database(public_vpc, private_subnets, application_instances=instances, publicly_accessible=False, multi_az=True)
 
+    ssl_certificate = iam.upload_ssl_certificate('public-key.crt',
+                                                 'private-key.pem',
+                                                 certificate_chain='certificate_chain.pem')
+
+    load_balancer = ec2.create_elb(vpc, public_subnets, ssl_certificate=ssl_certificate)
+
+    # logger.info('Registering EC2 Instances with Elastic Load Balancer (%s).' % load_balancer.name)
+    # elb_connection.register_instances(load_balancer.name, [instance.id for instance in instances])
+    # logger.info('Registered EC2 Instances with Elastic Load Balancer (%s).' % load_balancer.name)
+
     # archive_name = '.'.join([s3.PROJECT_NAME, 'tar', 'gz'])
     # logger.info('Creating deployment archive (%s).' % archive_name)
     # s3.make_tarfile(archive_name, s3.PROJECT_DIRECTORY)
@@ -56,20 +66,12 @@ def main():
     # s3.add_object(bucket, bootstrap_archive_name)
     # policy = s3.get_bucket_policy(bucket)
 
-    # cert_arn = iam.upload_ssl_certificate()
-    # sg = ec2.create_security_group(public_vpc)
-    # load_balancer = ec2.create_elb(sg, public_subnets, cert_arn)
-
     # script = get_script('us-east-1', bucket.name, archive_name, bootstrap_archive_name)
     # script = ec2.install_package(script, 'python3-pip')
     # script = ec2.run(script, 'pip3 install virtualenv')
     # script = ec2.run(script, 'pip3 install virtualenvwrapper')
 
     # instance_profile_name = iam.create_role(policy)
-
-    # logger.info('Registering EC2 Instances with Elastic Load Balancer (%s).' % load_balancer.name)
-    # elb_connection.register_instances(load_balancer.name, [instance.id for instance in instances])
-    # logger.info('Registered EC2 Instances with Elastic Load Balancer (%s).' % load_balancer.name)
 
     # # Get created EC2 instances.
     # reservations = ec2_connection.get_all_instances(filters={'tag:Project': core.PROJECT_NAME.lower(),
