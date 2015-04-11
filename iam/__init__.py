@@ -120,32 +120,44 @@ def create_role(inline_policies):
     time.sleep(5) # Required 5-second sleep.
     return instance_profile
 
-def upload_ssl_certificate():
-    cert_arn = None
+def upload_ssl_certificate(public_key, private_key, certificate_chain=None, name=None):
+    # Connect to the Amazon Identity and Access Management (Amazon IAM) service.
     iam_connection = connect_iam()
 
-    cert_name = '-'.join(['crt', core.PROJECT_NAME.lower(), core.args.environment.lower()])
-    with open('public-key.crt', 'r') as cert_file:
-        cert_body=cert_file.read()
-    with open('private-key.pem', 'r') as private_key_file:
-        private_key=private_key_file.read()
-    with open('certificate-chain.pem', 'r') as cert_chain_file:
-        cert_chain=cert_chain_file.read()
+    # Generate Certificate name.
+    if not name:
+        name = '-'.join(['crt', core.PROJECT_NAME.lower(), core.args.environment.lower()])
 
+    # Read SSL Public Key.
+    with open(public_key, 'r') as public_key_file:
+        public_key = public_key_file.read()
+
+    # Read SSL Private Key.
+    with open(private_key, 'r') as private_key_file:
+        private_key = private_key_file.read()
+
+    # Read SSL Certificate Chain, if it was specified.
+    if certificate_chain:
+        with open(certificate_chain, 'r') as certificate_chain_file:
+            certificate_chain = certificate_chain_file.read()
+
+    # Delete Server Certificate, if one exists.
     try:
-        logger.info('Deleting server certificate (%s).' % cert_name)
-        iam_connection.delete_server_cert(cert_name)
-        logger.info('Deleted server certificate (%s).' % cert_name)
+        logger.info('Deleting Server Certificate (%s).' % name)
+        iam_connection.delete_server_cert(name)
+        logger.info('Deleted Server Certificate (%s).' % name)
     except boto.exception.BotoServerError as error:
         if error.status == 400: # Bad Request
-            logger.error('Couldn\'t delete server certificate (%s) due to an incompatible filename Error %s: %s.' % (cert_name, error.status, error.reason))
+            logger.error('Couldn\'t delete Server Certificate (%s) due to an incompatible filename Error %s: %s.' % (name, error.status, error.reason))
         if error.status == 404: # Not Found
-            logger.error('Couldn\'t delete server certificate (%s) due to Error %s: %s.' % (cert_name, error.status, error.reason))
+            logger.error('Couldn\'t delete Server Certificate (%s) due to Error %s: %s.' % (name, error.status, error.reason))
 
+    # Upload the SSL Certificate to Amazon IAM.
+    cert_arn = None
     try:
-        logger.info('Uploading server certificate (%s).' % cert_name)
-        response = iam_connection.upload_server_cert(cert_name, cert_body, private_key, cert_chain)
-        logger.info('Uploaded server certificate (%s).' % cert_name)
+        logger.info('Uploading server certificate (%s).' % name)
+        response = iam_connection.upload_server_cert(name, public_key, private_key, certificate_chain)
+        logger.info('Uploaded server certificate (%s).' % name)
         server_certificate_id = response['upload_server_certificate_response']\
                                         ['upload_server_certificate_result']\
                                         ['server_certificate_metadata']\
@@ -157,8 +169,8 @@ def upload_ssl_certificate():
         time.sleep(5) # required 5-second sleep
     except boto.exception.BotoServerError as error:
         if error.status == 400: # Bad Request
-            logger.error('Couldn\'t upload server certificate (%s) due to an issue with its contents and/or formatting Error %s: %s.' % (cert_name, error.status, error.reason))
+            logger.error('Couldn\'t upload server certificate (%s) due to an issue with its contents and/or formatting Error %s: %s.' % (name, error.status, error.reason))
         if error.status == 409: # Conflict
-            logger.error('Couldn\'t upload server certificate (%s) due to Error %s: %s.' % (cert_name, error.status, error.reason))
+            logger.error('Couldn\'t upload server certificate (%s) due to Error %s: %s.' % (name, error.status, error.reason))
 
     return cert_arn
