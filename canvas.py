@@ -45,9 +45,10 @@ def main():
 
     ssl_certificate = iam.upload_ssl_certificate('public-key.crt',
                                                  'private-key.pem',
-                                                 certificate_chain='certificate_chain.pem')
+                                                 certificate_chain='certificate-chain.pem')
 
-    load_balancer = ec2.create_elb(vpc, public_subnets, ssl_certificate=ssl_certificate)
+    instance_security_groups = [group for instance in instances for group in instance.groups]
+    load_balancer = ec2.create_elb(public_vpc, public_subnets, ssl_certificate=ssl_certificate, security_groups=instance_security_groups)
 
     # logger.info('Registering EC2 Instances with Elastic Load Balancer (%s).' % load_balancer.name)
     # elb_connection.register_instances(load_balancer.name, [instance.id for instance in instances])
