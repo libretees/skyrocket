@@ -1,4 +1,5 @@
 import sys
+import time
 import logging
 import boto
 import ec2
@@ -100,12 +101,6 @@ def create_option_group(name=None):
     # Connect to the Amazon Relational Database Service (Amazon RDS).
     rds_connection = connect_rds()
 
-    # Generate Option Group name.
-    if not name:
-        name = '-'.join(['og',
-                         PROJECT_NAME.lower(),
-                         core.args.environment.lower(),])
-
     engine_name = {
         'django.db.backends.postgresql_psycopg2': 'postgres',
         'django.db.backends.mysql':               'MySQL',
@@ -118,12 +113,20 @@ def create_option_group(name=None):
         'django.db.backends.oracle':              '11.2.0.2.v2',
     }
 
+    # Generate Option Group name.
+    if not name:
+        name = '-'.join(['og',
+                         PROJECT_NAME.lower(),
+                         core.args.environment.lower(),])
+
     # Delete Option Group.
     try:
         rds_connection.delete_option_group(name)
     except boto.exception.JSONResponseError as error:
-        if error.code == 'OptionGroupNotFoundFault':
+        if error.status == 404 and error.reason == 'Not Found' and error.body['Error']['Code'] == 'OptionGroupNotFoundFault':
             pass
+        else:
+            raise boto.exception.JSONResponseError(error.status, error.reason, body=error.body)
 
     # Create Option Group.
     option_group = rds_connection.create_option_group(name,                                     # option_group_name
