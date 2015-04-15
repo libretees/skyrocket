@@ -42,6 +42,7 @@ def main():
     nat_instances = ec2.create_nat_instances(public_vpc, public_subnets, private_subnets)
 
     database = rds.create_database(public_vpc, private_subnets, application_instances=instances, publicly_accessible=False, multi_az=True)
+    print('Database Endpoint:', database['Endpoint'])
 
     ssl_certificate = iam.upload_ssl_certificate('public-key.crt',
                                                  'private-key.pem',
@@ -85,9 +86,7 @@ def main():
     # curl http://169.254.169.254/latest/meta-data/iam/security-credentials/myrole
     # aws s3 cp --region us-east-1 s3://s3-gossamer-staging-faddde2b/gossamer.tar.gz gossamer.tar.gz
 
-    rds_connection = rds.connect_rds()
-    rs = rds_connection.describe_db_instances()
-    print(type(rs), rs)
+
 
 if __name__ == '__main__':
     main()

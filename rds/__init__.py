@@ -251,4 +251,18 @@ def create_database(vpc, subnets, application_instances=None, security_groups=No
                                          ('Environment', core.args.environment.lower())])
     logger.debug('Tagged Amazon RDS Resource (%s).' % database_arn)
 
+    # Get Database Endpoint.
+    endpoint = None
+    while not endpoint:
+        response = rds_connection.describe_db_instances(db_instance_identifier='dbinst1',
+                                                        filters=None,
+                                                        max_records=None,
+                                                        marker=None)
+        endpoint = response['DescribeDBInstancesResponse']\
+                           ['DescribeDBInstancesResult']\
+                           ['DBInstances'][-1]\
+                           ['Endpoint']
+        if not endpoint: time.sleep(1)
+    db_instance['Endpoint'] = endpoint
+
     return db_instance
