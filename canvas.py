@@ -3,6 +3,8 @@
 """canvas.py: Provision AWS environments for Django projects."""
 
 import sys
+import inspect
+import functools
 from string import Template
 import logging
 import core
@@ -28,28 +30,43 @@ def get_script(region, s3bucket, s3object, s3object2, filename='user-data.sh'):
         s3object2=s3object2
     )
 
-def main():
+def ephemeral(func):
+    @functools.wraps(func)
+    def decorator(*args, **kwargs):
+        core.MODE = core.EPHEMERAL
+        return func(*args, **kwargs)
+    logging.info('Decorated (%s) as ephemeral function.' % func.__name__)
+    return decorator
+
+@ephemeral
+def infrastructure():
     cidr_block = '10.0.0.0/16'
 
     if not vpc.validate_cidr_block(cidr_block):
         sys.exit(1)
 
-    public_vpc = vpc.create_vpc(cidr_block, internet_connected=True)
-    public_subnets = vpc.create_subnets(public_vpc, zones=['us-east-1b', 'us-east-1c'], byte_aligned=True, public=True)
-    private_subnets = vpc.create_subnets(public_vpc, zones=['us-east-1b', 'us-east-1c'], byte_aligned=True)
+    public_vpc = vpc.create_network(cidr_block, internet_connected=True, ephemeral=True)
 
-    instances = ec2.create_ec2_instances(public_vpc, public_subnets, role='application', internet_addressable=True)
-    nat_instances = ec2.create_nat_instances(public_vpc, public_subnets, private_subnets)
+def main():
 
-    database = rds.create_database(public_vpc, private_subnets, application_instances=instances, publicly_accessible=False, multi_az=True)
-    print('Database Endpoint:', database['Endpoint'])
+    #http://chimera.labs.oreilly.com/books/1230000000393/ch09.html#_problem_152
+    infrastructure()
 
-    ssl_certificate = iam.upload_ssl_certificate('public-key.crt',
-                                                 'private-key.pem',
-                                                 certificate_chain='certificate-chain.pem')
+    # public_subnets = vpc.create_subnets(public_vpc, zones=['us-east-1b', 'us-east-1c'], byte_aligned=True, public=True)
+    # private_subnets = vpc.create_subnets(public_vpc, zones=['us-east-1b', 'us-east-1c'], byte_aligned=True)
 
-    instance_security_groups = [group for instance in instances for group in instance.groups]
-    load_balancer = ec2.create_elb(public_vpc, public_subnets, ssl_certificate=ssl_certificate, security_groups=instance_security_groups)
+    # instances = ec2.create_ec2_instances(public_vpc, public_subnets, role='application', internet_addressable=True)
+    # nat_instances = ec2.create_nat_instances(public_vpc, public_subnets, private_subnets)
+
+    # database = rds.create_database(public_vpc, private_subnets, application_instances=instances, publicly_accessible=False, multi_az=True)
+    # print('Database Endpoint:', database['Endpoint'])
+
+    # ssl_certificate = iam.upload_ssl_certificate('public-key.crt',
+    #                                              'private-key.pem',
+    #                                              certificate_chain='certificate-chain.pem')
+
+    # instance_security_groups = [group for instance in instances for group in instance.groups]
+    # load_balancer = ec2.create_elb(public_vpc, public_subnets, ssl_certificate=ssl_certificate, security_groups=instance_security_groups)
 
     # logger.info('Registering EC2 Instances with Elastic Load Balancer (%s).' % load_balancer.name)
     # elb_connection.register_instances(load_balancer.name, [instance.id for instance in instances])

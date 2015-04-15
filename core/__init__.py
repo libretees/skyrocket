@@ -11,6 +11,9 @@ settings = import_settings(args)
 PROJECT_NAME = os.path.abspath(os.path.expanduser(args.directory)).split(os.sep)[-1]
 PROJECT_DIRECTORY = os.path.abspath(os.path.expanduser(args.directory))
 
+MODE = None
+EPHEMERAL = 'ephemeral'
+
 logger = logging.getLogger(__name__)
 
 def get_closest_region(service='ec2', repetitions=1):
