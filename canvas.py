@@ -38,6 +38,14 @@ def ephemeral(func):
     logging.info('Decorated (%s) as ephemeral function.' % func.__name__)
     return decorator
 
+def permanent(func):
+    @functools.wraps(func)
+    def decorator(*args, **kwargs):
+        core.MODE = core.PERMANENT
+        return func(*args, **kwargs)
+    logging.info('Decorated (%s) as permanent function.' % func.__name__)
+    return decorator
+
 @ephemeral
 def infrastructure():
     cidr_block = '10.0.0.0/16'

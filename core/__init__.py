@@ -13,6 +13,7 @@ PROJECT_DIRECTORY = os.path.abspath(os.path.expanduser(args.directory))
 
 MODE = None
 EPHEMERAL = 'ephemeral'
+PERMANENT = 'permanent'
 
 logger = logging.getLogger(__name__)
 
