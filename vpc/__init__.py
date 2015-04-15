@@ -54,35 +54,36 @@ def validate_cidr_block(cidr_block):
         logger.error('Invalid CIDR block given (%s).' % cidr_block)
         return False
 
-def create_vpc(cidr_block, internet_connected=False):
+def create_network(cidr_block, name=None, internet_connected=False, ephemeral=False):
     # Connect to the Amazon Virtual Private Cloud (Amazon VPC) service.
     vpc_connection = connect_vpc()
 
     # Connect to the Amazon Elastic Compute Cloud (Amazon EC2) service.
     ec2_connection = ec2.connect_ec2()
 
-    # Generate Virtual Private Cloud (VPC) name.
-    vpc_name = '-'.join(['vpc', core.PROJECT_NAME.lower(), core.args.environment.lower()])
+    # Generate Virtual Private Cloud (VPC) name, if needed.
+    if not name:
+        name = '-'.join(['vpc', core.PROJECT_NAME.lower(), core.args.environment.lower()])
 
     # Create Virtual Private Cloud (VPC).
-    new_vpc = None
+    vpc = None
     try:
-        logger.info('Creating Virtual Private Cloud (VPC) (%s) with CIDR block (%s).' % (vpc_name, cidr_block))
-        new_vpc = vpc_connection.create_vpc(cidr_block,                 # cidr_block
-                                            instance_tenancy='default',
-                                            dry_run=False)
-        logger.info('Created Virtual Private Cloud (VPC) (%s).' % vpc_name)
+        logger.info('Creating Virtual Private Cloud (VPC) (%s) with CIDR block (%s).' % (name, cidr_block))
+        vpc = vpc_connection.create_vpc(cidr_block,                 # cidr_block
+                                        instance_tenancy='default',
+                                        dry_run=False)
+        logger.info('Created Virtual Private Cloud (VPC) (%s).' % name)
     except boto.exception.EC2ResponseError as error:
         if error.status == 400: # Bad Request
-            logger.error('Error %s: %s. Could not create VPC (%s). %s' % (error.status, error.reason, vpc_name, error.message))
+            logger.error('Error %s: %s. Could not create VPC (%s). %s' % (error.status, error.reason, name, error.message))
 
     # Tag Virtual Private Cloud (VPC).
     tagged = False
     while not tagged:
         try:
-            tagged = ec2_connection.create_tags([new_vpc.id], {'Name': vpc_name,
-                                                               'Project': core.PROJECT_NAME.lower(),
-                                                               'Environment': core.args.environment.lower()})
+            tagged = ec2_connection.create_tags([vpc.id], {'Name': name,
+                                                           'Project': core.PROJECT_NAME.lower(),
+                                                           'Environment': core.args.environment.lower()})
         except boto.exception.EC2ResponseError as error:
             if error.code == 'InvalidVpcID.NotFound': # VPC hasn't registered with Virtual Private Cloud (VPC) service yet.
                 pass
@@ -90,7 +91,7 @@ def create_vpc(cidr_block, internet_connected=False):
                 raise boto.exception.EC2ResponseError
 
     # Tag default Security Group.
-    security_groups = ec2_connection.get_all_security_groups(filters={'vpc-id': new_vpc.id,})
+    security_groups = ec2_connection.get_all_security_groups(filters={'vpc-id': vpc.id,})
     for security_group in security_groups:
         tagged = False
         security_group_name = '-'.join(['gp', core.PROJECT_NAME.lower(), core.args.environment.lower(), 'default'])
@@ -107,7 +108,7 @@ def create_vpc(cidr_block, internet_connected=False):
                     raise boto.exception.EC2ResponseError
 
     # Tag Main Route Table.
-    route_tables = vpc_connection.get_all_route_tables(filters={'vpc-id': new_vpc.id,})
+    route_tables = vpc_connection.get_all_route_tables(filters={'vpc-id': vpc.id,})
     for route_table in route_tables:
         tagged = False
         route_table_name = '-'.join(['rtb', core.PROJECT_NAME.lower(), core.args.environment.lower(), 'main'])
@@ -124,7 +125,7 @@ def create_vpc(cidr_block, internet_connected=False):
                     raise boto.exception.EC2ResponseError
 
     # Tag Access Control Lists (ACLs).
-    acls = vpc_connection.get_all_network_acls(filters={'vpc-id': new_vpc.id,})
+    acls = vpc_connection.get_all_network_acls(filters={'vpc-id': vpc.id,})
     for acl in acls:
         tagged = False
         acl_name = '-'.join(['acl', core.PROJECT_NAME.lower(), core.args.environment.lower()])
@@ -140,7 +141,7 @@ def create_vpc(cidr_block, internet_connected=False):
                     raise boto.exception.EC2ResponseError
 
     # Tag DHCP Options Set.
-    dhcp_options = vpc_connection.get_all_dhcp_options(new_vpc.dhcp_options_id)
+    dhcp_options = vpc_connection.get_all_dhcp_options(vpc.dhcp_options_id)
     for dhcp_option in dhcp_options:
         tagged = False
         dhcp_option_name = '-'.join(['dopt', core.PROJECT_NAME.lower(), core.args.environment.lower()])
@@ -156,9 +157,9 @@ def create_vpc(cidr_block, internet_connected=False):
                     raise boto.exception.EC2ResponseError
 
     if internet_connected:
-        attach_internet_gateway(new_vpc)
+        attach_internet_gateway(vpc)
 
-    return new_vpc
+    return vpc
 
 def attach_internet_gateway(vpc):
     # Connect to the Amazon Virtual Private Cloud (Amazon VPC) service.
