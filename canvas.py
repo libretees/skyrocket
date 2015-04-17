@@ -3,8 +3,6 @@
 """canvas.py: Provision AWS environments for Django projects."""
 
 import sys
-import inspect
-import functools
 from string import Template
 import logging
 import core
@@ -29,22 +27,6 @@ def get_script(region, s3bucket, s3object, s3object2, filename='user-data.sh'):
         s3object=s3object,
         s3object2=s3object2
     )
-
-def ephemeral(func):
-    @functools.wraps(func)
-    def decorator(*args, **kwargs):
-        core.MODE = core.EPHEMERAL
-        return func(*args, **kwargs)
-    logging.info('Decorated (%s) as ephemeral function.' % func.__name__)
-    return decorator
-
-def permanent(func):
-    @functools.wraps(func)
-    def decorator(*args, **kwargs):
-        core.MODE = core.PERMANENT
-        return func(*args, **kwargs)
-    logging.info('Decorated (%s) as permanent function.' % func.__name__)
-    return decorator
 
 @ephemeral
 def infrastructure():
