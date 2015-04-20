@@ -23,11 +23,14 @@ def permanent(func):
 
 def infrastructure(*args, **kwargs):
 
-    invoked = bool(not args or kwargs)
+    # Determine whether or not the decorator was invoked.
+    invoked = bool(args and not callable(args[0]) or kwargs)
     if not invoked:
-        func, args = args[0], ()
+        function, args = args[0], ()
 
-    def decorator(func):
-        return Infrastructure(func, *args, **kwargs)
+    # Define decorator function.
+    def decorator(function):
+        return Infrastructure(function, *args, **kwargs)
 
-    return decorator if invoked else decorator(func)
+    # If invoked, return the decorator function, which will then be called. Otherwise, return the decorated function.
+    return decorator if invoked else decorator(function)

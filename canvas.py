@@ -2,7 +2,9 @@
 # -*- coding: utf-8 -*-
 """canvas.py: Provision AWS environments for Django projects."""
 
+import os
 import sys
+import importlib
 from string import Template
 import logging
 import core
@@ -28,19 +30,28 @@ def get_script(region, s3bucket, s3object, s3object2, filename='user-data.sh'):
         s3object2=s3object2
     )
 
-@ephemeral
-def infrastructure():
-    cidr_block = '10.0.0.0/16'
+def load_skyfile(path='./skyfile.py', module_name='skyfile'):
 
-    if not vpc.validate_cidr_block(cidr_block):
-        sys.exit(1)
+    # Import Skyfile (Only works in Python 3.3+).
+    loader = importlib.machinery.SourceFileLoader(module_name, path)
+    module = loader.load_module()
+    logger.info('Loaded (%s) module from (%s).' % (module_name, path))
 
-    public_vpc = vpc.create_network(cidr_block, internet_connected=True, ephemeral=True)
+    directory, skyfile = os.path.split(path)
 
 def main():
 
+    load_skyfile()
+
+    # cidr_block = '10.0.0.0/16'
+
+    # if not vpc.validate_cidr_block(cidr_block):
+    #     sys.exit(1)
+
+    #public_vpc = vpc.create_network(cidr_block, internet_connected=True, ephemeral=True)
+
     #http://chimera.labs.oreilly.com/books/1230000000393/ch09.html#_problem_152
-    infrastructure()
+    #infrastructure()
 
     # public_subnets = vpc.create_subnets(public_vpc, zones=['us-east-1b', 'us-east-1c'], byte_aligned=True, public=True)
     # private_subnets = vpc.create_subnets(public_vpc, zones=['us-east-1b', 'us-east-1c'], byte_aligned=True)
