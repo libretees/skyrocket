@@ -32,12 +32,28 @@ def ephemeral(*args, **kwargs):
 
     return decorator
 
-def permanent(func):
-    @functools.wraps(func)
-    def decorator(*args, **kwargs):
-        core.CREATION_MODE = core.PERMANENT
-        return func(*args, **kwargs)
-    logging.info('Decorated (%s) as a \'Permanent\' Creation Mode function.' % func.__name__)
+def permanent(*args, **kwargs):
+    # Determine whether or not the decorator was invoked.
+    invoked = bool(args and not callable(args[0]) or kwargs)
+
+    if not invoked:
+        # Wrap the function in a decorator that sets the infrastructure creation mode to PERMANENT.
+
+        function, args = args[0], ()
+        @functools.wraps(function)
+        def decorator(*args, **kwargs):
+            core.CREATION_MODE = PERMANENT
+            return function(*args, **kwargs)
+        logging.info('Decorated (%s) as a \'Permanent\' Creation Mode function.' % function.__name__)
+    else:
+        # Define a decorator that will wrap a function in an Permanent Infrastructure object.
+
+        def decorator(function):
+            infrastructure = Infrastructure(function, *args, **kwargs)
+            infrastructure.category = PERMANENT
+            logging.info('Decorated (%s) as an Permanent Infrastructure object.' % function.__name__)
+            return infrastructure
+
     return decorator
 
 def infrastructure(*args, **kwargs):
