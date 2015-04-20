@@ -7,6 +7,7 @@ import sys
 import importlib
 from string import Template
 import logging
+from sky.infrastructure import Infrastructure
 import core
 import vpc
 import ec2
@@ -31,17 +32,33 @@ def get_script(region, s3bucket, s3object, s3object2, filename='user-data.sh'):
     )
 
 def load_skyfile(path='./skyfile.py', module_name='skyfile'):
-
     # Import Skyfile (Only works in Python 3.3+).
     loader = importlib.machinery.SourceFileLoader(module_name, path)
     module = loader.load_module()
     logger.info('Loaded (%s) module from (%s).' % (module_name, path))
 
-    directory, skyfile = os.path.split(path)
+    return module
+
+def load_infrastructure(module):
+
+    imported_symbols = vars(module)
+
+    if '__all__' in imported_symbols:
+        # Obey the use of <module>.__all__, if it is present.
+        imported_symbols = [(name, imported_symbols[name]) for name in \
+                            imported_symbols if name in imported_symbols['__all__']]
+    else:
+        imported_symbols = imported_symbols.items()
+
+    for symbol in imported_symbols:
+        name, obj = symbol
+        if isinstance(obj, Infrastructure):
+            logger.info('\'%s\' is a %s.' % (name, obj))
 
 def main():
 
-    load_skyfile()
+    module = load_skyfile()
+    load_infrastructure(module)
 
     # cidr_block = '10.0.0.0/16'
 
