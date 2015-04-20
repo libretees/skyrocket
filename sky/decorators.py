@@ -13,17 +13,21 @@ def ephemeral(*args, **kwargs):
     invoked = bool(args and not callable(args[0]) or kwargs)
 
     if not invoked:
-        # Wrap the function in a decorator that sets the infrastructure creation mode to EPHEMERAL.
-
-        function, args = args[0], ()
-        @functools.wraps(function)
-        def decorator(*args, **kwargs):
-            core.CREATION_MODE = EPHEMERAL
-            return function(*args, **kwargs)
-        logging.info('Decorated (%s) as a \'Ephemeral\' Creation Mode function.' % function.__name__)
+        if isinstance(args[0], Infrastructure):
+            # Set a wrapped Infractructure object to EPHEMERAL creation mode.
+            infrastructure = args[0]
+            infrastructure.category = EPHEMERAL
+            decorator = infrastructure
+        else:
+            # Wrap a function in a decorator that sets the infrastructure creation mode to EPHEMERAL.
+            function, args = args[0], ()
+            @functools.wraps(function)
+            def decorator(*args, **kwargs):
+                core.CREATION_MODE = EPHEMERAL
+                return function(*args, **kwargs)
+            logging.info('Decorated (%s) as an \'Ephemeral\' Creation Mode function.' % function.__name__)
     else:
         # Define a decorator that will wrap a function in an Ephemeral Infrastructure object.
-
         def decorator(function):
             infrastructure = Infrastructure(function, *args, **kwargs)
             infrastructure.category = EPHEMERAL
@@ -67,5 +71,5 @@ def infrastructure(*args, **kwargs):
     def decorator(function):
         return Infrastructure(function, *args, **kwargs)
 
-    # If invoked, return the decorator function, which will then be called. Otherwise, return the decorated function.
+    # If invoked, return the decorator function, which be called immediately. Otherwise, return the decorated function.
     return decorator if invoked else decorator(function)

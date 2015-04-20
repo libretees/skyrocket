@@ -1,3 +1,7 @@
+import logging
+
+logger = logging.getLogger(__name__)
+
 class Infrastructure(object):
 
      _category = None
@@ -22,3 +26,4 @@ class Infrastructure(object):
      @category.setter
      def category(self, category):
           self._category = category
+          logger.info('Set Infrastructure object at (%d) to \'%s\' Creation Mode.' % (id(self), category.title()))
