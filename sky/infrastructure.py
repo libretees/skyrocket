@@ -1,5 +1,7 @@
 class Infrastructure(object):
 
+     _category = None
+
      def __init__(self, callable, environment=None):
           self.wrapped = callable
 
@@ -12,3 +14,11 @@ class Infrastructure(object):
 
      def run(self, *args, **kwargs):
         return self.wrapped(*args, **kwargs)
+
+     @property
+     def category(self):
+          return self._category
+
+     @category.setter
+     def category(self, category):
+          self._category = category
