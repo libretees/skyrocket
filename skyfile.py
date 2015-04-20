@@ -1,6 +1,6 @@
 from sky.api import permanent, ephemeral, infrastructure
 
-@ephemeral
+@permanent
 @infrastructure(environment='test')
 def provision():
     print('test')
