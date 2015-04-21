@@ -16,6 +16,7 @@ def configure_logger(args):
 def parse_arguments():
     valid_arguments = True
     parser = argparse.ArgumentParser(description='Provision Django application environments.')
+    parser.add_argument('command', metavar='<command>', action='store', help='Valid commands are [deploy]')
     parser.add_argument('-p', '--project', dest='directory', action='store', default=os.getcwd(),
                         help='set Django project directory')
     parser.add_argument('-env', '--environment', dest='environment', action='store', default='STAGING',
@@ -30,6 +31,12 @@ def parse_arguments():
                         help='set log level [DEBUG, INFO, WARNING, ERROR, CRITICAL] (default: ERROR)')
     parser.add_argument('--dry', dest='dry_run', action='store_true', default=False,
                         help='perform a dry run')
+
+    # Display help, if no command was supplied.
+    if len(sys.argv) == 1:
+        parser.print_help()
+        sys.exit(1)
+
     args = parser.parse_args()
 
     try:
@@ -39,7 +46,15 @@ def parse_arguments():
     except AssertionError:
         print('ERROR:', __name__, ':Invalid log option (%s).' % args.loglevel, file=sys.stderr, sep='')
         valid_arguments = False
+
     configure_logger(args)
+
+    try:
+        assert args.command.upper() in ['DEPLOY']
+        logger.debug('Command argument validated (%s).' % args.command)
+    except AssertionError:
+        logger.error('Invalid command (%s).' % args.command)
+        valid_arguments = False
 
     try:
         assert args.environment.upper() in ['STAGING', 'PROD', 'PRODUCTION']
@@ -112,8 +127,7 @@ def parse_arguments():
 
     if not valid_arguments:
         logger.error('Invalid arguments given.')
-        if __name__ == '__main__':
-            logger.error('Exiting...')
-            sys.exit(1)
+        logger.error('Exiting...')
+        sys.exit(1)
 
     return args
