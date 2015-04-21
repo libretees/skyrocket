@@ -6,13 +6,16 @@ class Infrastructure(object):
 
      wrapped = None
      environment = None
-     depends = None
+     dependencies = None
      _category = None
 
      def __init__(self, callable, *args, **kwargs):
           self.wrapped = callable
           self.environment = kwargs.get('environment', None)
-          self.depends = kwargs.get('depends', None)
+
+          self.dependencies = kwargs.get('requires', None)
+          if self.dependencies:
+               self.dependencies = set(self.dependencies)
 
           self.__name__ = callable.__name__ if hasattr(callable, '__name__') else 'undefined'
           self.__doc__ = callable.__doc__ if hasattr(callable, '__doc__') else None
@@ -31,4 +34,4 @@ class Infrastructure(object):
      @category.setter
      def category(self, category):
           self._category = category
-          logger.info('Set Infrastructure object at (%d) to \'%s\' Creation Mode.' % (id(self), category.title()))
+          logger.debug('Set Infrastructure object at (0x%x) to \'%s\' Creation Mode.' % (id(self), category.title()))

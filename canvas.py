@@ -56,22 +56,63 @@ def load_infrastructure(module):
     for symbol in imported_symbols:
         name, obj = symbol
         if isinstance(obj, Infrastructure):
-            logger.info('\'%s\' is a %s object imported from the \'%s\' module.' % (name, type(obj), module.__name__))
+            logger.debug('(%s) is a %s object imported from the (%s) module.' % (name, type(obj), module.__name__))
             infrastructure_objects.append(obj)
         elif isinstance(obj, types.ModuleType):
-            logger.info('\'%s\' module imported from the \'%s\' module.' % (name, module.__name__))
+            logger.debug('(%s) module imported from the (%s) module.' % (name, module.__name__))
             infrastructure_objects += load_infrastructure(obj)
 
     return infrastructure_objects
 
+def build_dependency_graph(nodes):
+
+    # Create an empty graph.
+    graph = []
+
+    # Create a copy of the nodes list to work with.
+    nodes = list(nodes)
+
+    # Determine independent nodes.
+    independent_nodes = [node for node in nodes if not node.dependencies]
+
+    if independent_nodes:
+        # Remove independent nodes from the search.
+        for independent_node in independent_nodes:
+            nodes.remove(independent_node)
+            logger.debug('(%s) is ready.' % independent_node.__name__)
+
+        # Prune independent node from all node dependencies.
+        for name, dependencies in [(node.__name__, node.dependencies) for node in nodes if node.dependencies]:
+            logger.debug('(%s) required: (%s).' % (name, ', '.join(list(dependencies))))
+            resolved_dependencies = {independent_node.__name__ for independent_node in independent_nodes}
+            dependencies.difference_update(resolved_dependencies)
+            logger.debug('(%s) now requires: (%s).' % (name, ', '.join(list(dependencies))))
+
+        # Repeat search for newly-independent nodes, if any are left.
+        if nodes:
+            graph = build_dependency_graph(nodes)
+
+        # Build graph from the independent nodes to the most-dependent nodes.
+        graph.insert(0, independent_nodes)
+
+    return graph
+
 def main():
 
     module = load_skyfile()
-    i = load_infrastructure(module)
+    infrastructure = load_infrastructure(module)
 
-    for a in i:
-        print(a.depends)
-        a()
+    graph = build_dependency_graph(infrastructure)
+
+    for group in graph:
+        for member in group:
+            member()
+
+    #print(graph)
+
+    # for component in infrastructure:
+    #     print(component.__name__, component.requires)
+    #     component()
 
     # cidr_block = '10.0.0.0/16'
 
