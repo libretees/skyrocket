@@ -69,6 +69,10 @@ def main():
     module = load_skyfile()
     i = load_infrastructure(module)
 
+    for a in i:
+        print(a.depends)
+        a()
+
     # cidr_block = '10.0.0.0/16'
 
     # if not vpc.validate_cidr_block(cidr_block):

@@ -65,7 +65,6 @@ def permanent(*args, **kwargs):
     return decorator
 
 def infrastructure(*args, **kwargs):
-
     # Determine whether or not the decorator was invoked.
     invoked = bool(args and not callable(args[0]) or kwargs)
     if not invoked:

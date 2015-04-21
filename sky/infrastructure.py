@@ -4,10 +4,15 @@ logger = logging.getLogger(__name__)
 
 class Infrastructure(object):
 
+     wrapped = None
+     environment = None
+     depends = None
      _category = None
 
-     def __init__(self, callable, environment=None):
+     def __init__(self, callable, *args, **kwargs):
           self.wrapped = callable
+          self.environment = kwargs.get('environment', None)
+          self.depends = kwargs.get('depends', None)
 
           self.__name__ = callable.__name__ if hasattr(callable, '__name__') else 'undefined'
           self.__doc__ = callable.__doc__ if hasattr(callable, '__doc__') else None
