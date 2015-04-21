@@ -5,6 +5,7 @@
 import os
 import sys
 import importlib
+import types
 from string import Template
 import logging
 from sky.infrastructure import Infrastructure
@@ -41,6 +42,8 @@ def load_skyfile(path='./skyfile.py', module_name='skyfile'):
 
 def load_infrastructure(module):
 
+    infrastructure_objects = []
+
     imported_symbols = vars(module)
 
     if '__all__' in imported_symbols:
@@ -53,12 +56,18 @@ def load_infrastructure(module):
     for symbol in imported_symbols:
         name, obj = symbol
         if isinstance(obj, Infrastructure):
-            logger.info('\'%s\' is a %s.' % (name, obj))
+            logger.info('\'%s\' is a %s object imported from the \'%s\' module.' % (name, type(obj), module.__name__))
+            infrastructure_objects.append(obj)
+        elif isinstance(obj, types.ModuleType):
+            logger.info('\'%s\' module imported from the \'%s\' module.' % (name, module.__name__))
+            infrastructure_objects += load_infrastructure(obj)
+
+    return infrastructure_objects
 
 def main():
 
     module = load_skyfile()
-    load_infrastructure(module)
+    i = load_infrastructure(module)
 
     # cidr_block = '10.0.0.0/16'
 
