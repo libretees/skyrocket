@@ -10,7 +10,8 @@ PERMANENT = core.PERMANENT
 
 def ephemeral(*args, **kwargs):
     # Determine whether or not the decorator was invoked.
-    invoked = bool(args and not callable(args[0]) or kwargs)
+    invoked = bool(not args or args and not callable(args[0]) or kwargs)
+    logger.debug('Decorator was invoked.' if invoked else 'Decorator was not invoked.')
 
     if not invoked:
         if isinstance(args[0], Infrastructure):
@@ -38,7 +39,8 @@ def ephemeral(*args, **kwargs):
 
 def permanent(*args, **kwargs):
     # Determine whether or not the decorator was invoked.
-    invoked = bool(args and not callable(args[0]) or kwargs)
+    invoked = bool(not args or args and not callable(args[0]) or kwargs)
+    logger.debug('Decorator was invoked.' if invoked else 'Decorator was not invoked.')
 
     if not invoked:
         if isinstance(args[0], Infrastructure):
@@ -66,7 +68,9 @@ def permanent(*args, **kwargs):
 
 def infrastructure(*args, **kwargs):
     # Determine whether or not the decorator was invoked.
-    invoked = bool(args and not callable(args[0]) or kwargs)
+    invoked = bool(not args or args and not callable(args[0]) or kwargs)
+    logger.debug('Decorator was invoked.' if invoked else 'Decorator was not invoked.')
+
     if not invoked:
         function, args = args[0], ()
 
