@@ -34,4 +34,4 @@ class Infrastructure(object):
      @category.setter
      def category(self, category):
           self._category = category
-          logger.debug('Set Infrastructure object at (0x%x) to \'%s\' Creation Mode.' % (id(self), category.title()))
+          logger.debug('Set Infrastructure object (%s) at (0x%x) to \'%s\' Creation Mode.' % (self.__name__, id(self), category.title()))

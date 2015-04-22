@@ -6,7 +6,7 @@ from operator import itemgetter
 import boto
 import iam
 import ec2
-import vpc as vpc_pkg
+import sky.networking as vpc_pkg
 import core
 
 logger = logging.getLogger(__name__)

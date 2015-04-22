@@ -10,12 +10,6 @@ from string import Template
 import logging
 from sky.infrastructure import Infrastructure
 import core
-import vpc
-import ec2
-import rds
-import s3
-import iam
-import boto
 
 __author__ = 'Jared Contrascere'
 __copyright__ = 'Copyright 2015, LibreTees, LLC'
@@ -76,7 +70,7 @@ def build_dependency_graph(nodes):
     independent_nodes = [node for node in nodes if not node.dependencies]
 
     if independent_nodes:
-        # Remove independent nodes from the search.
+        # Remove independent nodes from the search space.
         for independent_node in independent_nodes:
             nodes.remove(independent_node)
             logger.debug('(%s) is ready.' % independent_node.__name__)
@@ -114,18 +108,6 @@ def main():
     #     print(component.__name__, component.requires)
     #     component()
 
-    # cidr_block = '10.0.0.0/16'
-
-    # if not vpc.validate_cidr_block(cidr_block):
-    #     sys.exit(1)
-
-    #public_vpc = vpc.create_network(cidr_block, internet_connected=True, ephemeral=True)
-
-    #http://chimera.labs.oreilly.com/books/1230000000393/ch09.html#_problem_152
-    #infrastructure()
-
-    # public_subnets = vpc.create_subnets(public_vpc, zones=['us-east-1b', 'us-east-1c'], byte_aligned=True, public=True)
-    # private_subnets = vpc.create_subnets(public_vpc, zones=['us-east-1b', 'us-east-1c'], byte_aligned=True)
 
     # instances = ec2.create_ec2_instances(public_vpc, public_subnets, role='application', internet_addressable=True)
     # nat_instances = ec2.create_nat_instances(public_vpc, public_subnets, private_subnets)

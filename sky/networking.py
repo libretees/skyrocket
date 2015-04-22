@@ -5,7 +5,6 @@ import ipaddress
 import logging
 from operator import itemgetter
 import boto
-import ec2
 import core
 
 logger = logging.getLogger(__name__)
@@ -54,12 +53,28 @@ def validate_cidr_block(cidr_block):
         logger.error('Invalid CIDR block given (%s).' % cidr_block)
         return False
 
-def create_network(cidr_block, name=None, internet_connected=False, ephemeral=False):
+def create_network(name=None, internet_connected=False, **kwargs):
+    import ec2
+    
     # Connect to the Amazon Virtual Private Cloud (Amazon VPC) service.
     vpc_connection = connect_vpc()
 
     # Connect to the Amazon Elastic Compute Cloud (Amazon EC2) service.
     ec2_connection = ec2.connect_ec2()
+
+    if 'cidr_block' in kwargs:
+        cidr_block = kwargs['cidr_block']
+    elif 'network_class' in kwargs:
+        network_class = kwargs['network_class']
+        cidr_block = '10.0.0.0/16' if network_class.upper() == 'A' \
+                else '172.16.0.0/16' if network_class.upper() == 'B' \
+                else '192.168.0.0/16' if network_class.upper() == 'C' \
+                else '0.0.0.0/0'
+    else:
+        raise TypeError( "Value for cidr_block or network_class arguments must be specified." )
+        
+    if not validate_cidr_block(cidr_block):
+        sys.exit(1)
 
     # Generate Virtual Private Cloud (VPC) name, if needed.
     if not name:
@@ -162,6 +177,8 @@ def create_network(cidr_block, name=None, internet_connected=False, ephemeral=Fa
     return vpc
 
 def attach_internet_gateway(vpc):
+    import ec2
+    
     # Connect to the Amazon Virtual Private Cloud (Amazon VPC) service.
     vpc_connection = connect_vpc()
 
@@ -203,6 +220,8 @@ def attach_internet_gateway(vpc):
     return internet_gateway
 
 def create_route_table(vpc, name=None, internet_access=False):
+    import ec2
+    
     # Connect to the Amazon Virtual Private Cloud (Amazon VPC) service.
     vpc_connection = connect_vpc()
 
@@ -273,6 +292,8 @@ def create_route_table(vpc, name=None, internet_access=False):
     return route_table
 
 def create_subnets(vpc, zones='All', count=1, byte_aligned=False, balanced=False, public=False):
+    import ec2
+    
     # Connect to the Amazon Virtual Private Cloud (Amazon VPC) service.
     vpc_connection = connect_vpc()
 
@@ -362,6 +383,8 @@ def create_subnets(vpc, zones='All', count=1, byte_aligned=False, balanced=False
     return subnets
 
 def create_subnet(vpc, zone, cidr_block, subnet_name=None, route_table=None):
+    import ec2
+    
     # Connect to the Amazon Virtual Private Cloud (Amazon VPC) service.
     vpc_connection = connect_vpc()
 
