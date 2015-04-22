@@ -10,6 +10,7 @@ class Infrastructure(object):
      environment = None
      dependencies = None
      _category = None
+     _result = None
 
      def __init__(self, callable, *args, **kwargs):
           self.wrapped = callable
@@ -32,13 +33,13 @@ class Infrastructure(object):
                core.CREATION_MODE = self.category
                logger.debug('Set CREATION_MODE to \'%s\'.' % self.category.title())
 
-          result = self.wrapped(*args, **kwargs)
+          self._result = self.wrapped(*args, **kwargs)
 
           if self.category:
                core.CREATION_MODE = original_creation_mode
                logger.debug('Set CREATION_MODE to \'%s\'.' % original_creation_mode)
 
-          return result
+          return self._result
 
      @property
      def category(self):
@@ -48,3 +49,7 @@ class Infrastructure(object):
      def category(self, category):
           self._category = category
           logger.debug('Set Infrastructure object (%s) at (0x%x) to \'%s\' Creation Mode.' % (self.__name__, id(self), category.title()))
+
+     @property
+     def result(self):
+          return self._result
