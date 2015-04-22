@@ -1,4 +1,6 @@
 import logging
+import core
+
 
 logger = logging.getLogger(__name__)
 
@@ -25,7 +27,18 @@ class Infrastructure(object):
         return self.run(*args, **kwargs)
 
      def run(self, *args, **kwargs):
-        return self.wrapped(*args, **kwargs)
+          if self.category:
+               original_creation_mode = core.CREATION_MODE
+               core.CREATION_MODE = self.category
+               logger.debug('Set CREATION_MODE to \'%s\'.' % self.category.title())
+
+          result = self.wrapped(*args, **kwargs)
+
+          if self.category:
+               core.CREATION_MODE = original_creation_mode
+               logger.debug('Set CREATION_MODE to \'%s\'.' % original_creation_mode)
+
+          return result
 
      @property
      def category(self):
