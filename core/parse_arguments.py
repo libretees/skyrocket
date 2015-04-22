@@ -8,10 +8,15 @@ import logging
 logger = logging.getLogger(__name__)
 
 def configure_logger(args):
+    # Restrict the boto logger to the WARNING log level.
+    if args.loglevel.upper() in ['DEBUG', 'INFO', 'WARNING']:
+        logging.getLogger('boto').setLevel(logging.WARNING)
+
     numeric_level = getattr(logging, args.loglevel.upper(), None)
     if not isinstance(numeric_level, int):
         raise ValueError('Invalid log level: %s' % loglevel)
     logging.basicConfig(level=numeric_level)
+
 
 def parse_arguments():
     valid_arguments = True
