@@ -9,7 +9,7 @@ import types
 from string import Template
 import logging
 from sky.infrastructure import Infrastructure
-import core
+from sky.state import ready
 
 __author__ = 'Jared Contrascere'
 __copyright__ = 'Copyright 2015, LibreTees, LLC'
@@ -101,7 +101,7 @@ def main():
     for dependencies in graph:
         for dependency in dependencies:
             dependency()
-            core.infrastructure[dependency.__name__] = dependency
+            ready[dependency.__name__] = dependency
             print(dependency.__name__, 'resources:', dependency.resources)
 
     #print(graph)

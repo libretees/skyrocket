@@ -1,6 +1,6 @@
 import sys
 import logging
-import core
+from .state import CREATION_MODE
 
 logger = logging.getLogger(__name__)
 
@@ -57,15 +57,19 @@ class Infrastructure(object):
         return self._resources[name]
 
     def _set_creation_mode(self):
+        global CREATION_MODE
         if self.category:
-            self._original_creation_mode = core.CREATION_MODE
-            core.CREATION_MODE = self.category
+            self._original_creation_mode = CREATION_MODE
+            CREATION_MODE = self.category
             logger.debug('Set CREATION_MODE to \'%s\'.' % self.category.title())
 
     def _reset_creation_mode(self):
+        global CREATION_MODE
         if self.category:
-            core.CREATION_MODE = self._original_creation_mode
-            logger.debug('Set CREATION_MODE to \'%s\'.' % self._original_creation_mode)
+            CREATION_MODE = self._original_creation_mode
+            logger.debug('Set CREATION_MODE to \'%s\'.' % (self._original_creation_mode.title() \
+                                                           if isinstance(self._original_creation_mode, str) \
+                                                           else self._original_creation_mode))
 
     @property
     def category(self):

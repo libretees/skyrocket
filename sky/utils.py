@@ -1,11 +1,28 @@
 import os
 import sys
-import re
-import argparse
-import configparser
 import logging
+from re import search, IGNORECASE
+from argparse import ArgumentParser
+from configparser import ConfigParser
+from timeit import Timer
+from boto import regioninfo
 
 logger = logging.getLogger(__name__)
+
+def get_closest_region(service='ec2', repetitions=1):
+    regions = [region.name for region in regioninfo.get_regions(service) if 'gov' not in region.name and 'cn' not in region.name]
+
+    latency = {}
+    for region in regions:
+        connection = Timer("h.request('GET', '/')",
+                           "from http.client import HTTPSConnection; h=HTTPSConnection('ec2.%s.amazonaws.com')" % region)
+        times = connection.repeat(repetitions, 1)
+        avg_latency = sum(times)/float(len(times))
+        latency[region] = avg_latency
+        logger.info('Average latency to Amazon %s %s is %s' % (service.upper(), region, latency[region]))
+
+    region = min(latency, key=latency.get)
+    return region
 
 def configure_logger(args):
     # Restrict the boto logger to the WARNING log level.
@@ -17,10 +34,9 @@ def configure_logger(args):
         raise ValueError('Invalid log level: %s' % loglevel)
     logging.basicConfig(level=numeric_level)
 
-
 def parse_arguments():
     valid_arguments = True
-    parser = argparse.ArgumentParser(description='Provision Django application environments.')
+    parser = ArgumentParser(description='Provision Django application environments.')
     parser.add_argument('command', metavar='<command>', action='store', help='Valid commands are [deploy]')
     parser.add_argument('-p', '--project', dest='directory', action='store', default=os.getcwd(),
                         help='set Django project directory')
@@ -77,7 +93,7 @@ def parse_arguments():
         valid_arguments = False
 
     try:
-        assert re.search(r'^\d{12}$', args.account_id)
+        assert search(r'^\d{12}$', args.account_id)
         logger.debug('AWS Account ID argument validated (%s).' % args.account_id)
     except AssertionError:
         if len(args.account_id):
@@ -97,7 +113,7 @@ def parse_arguments():
         config_path = '/etc/boto.cfg'
 
     if config_path:
-        config = configparser.ConfigParser()
+        config = ConfigParser()
         config.sections()
         try:
             logger.info('Reading configuration file (%s).' % config_path)
@@ -109,7 +125,7 @@ def parse_arguments():
 
     try:
         args.key_id = args.key_id or key_id
-        assert re.search(r'^[A-Z0-9]{20}$', args.key_id, re.IGNORECASE)
+        assert search(r'^[A-Z0-9]{20}$', args.key_id, IGNORECASE)
         logger.debug('AWS Access Key ID argument validated (%s).' % args.key_id)
     except AssertionError:
         if len(args.key_id):
@@ -120,7 +136,7 @@ def parse_arguments():
 
     try:
         args.key = args.key or key
-        assert re.search(r'^[A-Z0-9/\+]{40}$', args.key, re.IGNORECASE)
+        assert search(r'^[A-Z0-9/\+]{40}$', args.key, IGNORECASE)
         logger.debug('AWS Account Secret Access Key argument validated.')
     except AssertionError:
         if len(args.key):

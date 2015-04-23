@@ -1,12 +1,9 @@
 import functools
 import logging
 from .infrastructure import Infrastructure
-import core
+from .state import CREATION_MODE, EPHEMERAL, PERMANENT
 
 logger = logging.getLogger(__name__)
-
-EPHEMERAL = core.EPHEMERAL
-PERMANENT = core.PERMANENT
 
 def ephemeral(*args, **kwargs):
     # Determine whether or not the decorator was invoked.
@@ -24,7 +21,7 @@ def ephemeral(*args, **kwargs):
             function, args = args[0], ()
             @functools.wraps(function)
             def decorator(*args, **kwargs):
-                core.CREATION_MODE = EPHEMERAL
+                CREATION_MODE = EPHEMERAL
                 return function(*args, **kwargs)
             logging.info('Decorated (%s) as an \'Ephemeral\' Creation Mode function.' % function.__name__)
     else:
@@ -53,7 +50,7 @@ def permanent(*args, **kwargs):
             function, args = args[0], ()
             @functools.wraps(function)
             def decorator(*args, **kwargs):
-                core.CREATION_MODE = PERMANENT
+                CREATION_MODE = PERMANENT
                 return function(*args, **kwargs)
             logging.info('Decorated (%s) as a \'Permanent\' Creation Mode function.' % function.__name__)
     else:
