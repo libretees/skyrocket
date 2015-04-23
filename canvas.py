@@ -102,7 +102,7 @@ def main():
         for dependency in dependencies:
             dependency()
             core.infrastructure[dependency.__name__] = dependency
-            print(dependency.__name__, 'resource:', dependency.resource)
+            print(dependency.__name__, 'resources:', dependency.resources)
 
     #print(graph)
 

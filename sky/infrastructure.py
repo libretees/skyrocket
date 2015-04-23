@@ -11,7 +11,7 @@ class Infrastructure(object):
     dependencies = None
     _category = None
     _original_creation_mode = None
-    _resource = {}
+    _resources = {}
     _result = None
 
     def __init__(self, callable_, *args, **kwargs):
@@ -22,9 +22,12 @@ class Infrastructure(object):
             self.dependencies = set(self.dependencies)
         self._locals = {}
 
-        self.__name__ = callable_.__name__ if hasattr(callable, '__name__') else 'undefined'
-        self.__doc__ = callable_.__doc__ if hasattr(callable, '__doc__') else None
-        self.__module__ = callable_.__module__ if hasattr(callable, '__module__') else None
+        self.__name__ = callable_.__name__ if hasattr(callable_, '__name__') else 'undefined'
+        self.__doc__ = callable_.__doc__ if hasattr(callable_, '__doc__') else None
+        self.__module__ = callable_.__module__ if hasattr(callable_, '__module__') else None
+
+    def __repr__(self):
+        return 'Infrastructure:' + self.__name__
 
     def __call__(self, *args, **kwargs):
 
@@ -34,7 +37,7 @@ class Infrastructure(object):
         # Define a source code profiler.
         def profiler(frame, event, arg):
             if event == 'return':
-                self._resource = frame.f_locals.copy()
+                self._resources = frame.f_locals.copy()
 
         # Activate the profiler on the next call, return or exception.
         sys.setprofile(profiler)
@@ -49,6 +52,9 @@ class Infrastructure(object):
         self._reset_creation_mode()
 
         return self._result
+
+    def __getitem__(self, name):
+        return self._resources[name]
 
     def _set_creation_mode(self):
         if self.category:
@@ -71,9 +77,9 @@ class Infrastructure(object):
         logger.debug('Set Infrastructure object (%s) at (0x%x) to \'%s\' Creation Mode.' % (self.__name__, id(self), category.title()))
 
     @property
-    def result(self):
-        return self._result
+    def resources(self):
+        return self._resources
 
     @property
-    def resource(self):
-        return self._resource
+    def result(self):
+        return self._result
