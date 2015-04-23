@@ -98,9 +98,11 @@ def main():
 
     graph = build_dependency_graph(infrastructure)
 
-    for group in graph:
-        for member in group:
-            member()
+    for dependencies in graph:
+        for dependency in dependencies:
+            dependency()
+            core.infrastructure[dependency.__name__] = dependency
+            print(dependency.__name__, 'resource:', dependency.resource)
 
     #print(graph)
 
