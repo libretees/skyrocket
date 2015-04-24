@@ -8,23 +8,20 @@ class Infrastructure(object):
 
     wrapped = None
     environment = None
-    dependencies = None
+    _dependencies = None
     _category = None
     _original_creation_mode = None
     _resources = {}
     _result = None
 
     def __init__(self, callable_, *args, **kwargs):
-        self.wrapped = callable_
-        self.environment = kwargs.get('environment', None)
-        self.dependencies = kwargs.get('requires', None)
-        if self.dependencies:
-            self.dependencies = set(self.dependencies)
-        self._locals = {}
-
         self.__name__ = callable_.__name__ if hasattr(callable_, '__name__') else 'undefined'
         self.__doc__ = callable_.__doc__ if hasattr(callable_, '__doc__') else None
         self.__module__ = callable_.__module__ if hasattr(callable_, '__module__') else None
+
+        self.wrapped = callable_
+        self.environment = kwargs.get('environment', None)
+        self.dependencies = kwargs.get('requires', None)
 
     def __repr__(self):
         return 'Infrastructure:' + self.__name__
@@ -72,13 +69,23 @@ class Infrastructure(object):
                                                            else self._original_creation_mode))
 
     @property
+    def dependencies(self):
+        return self._dependencies
+
+    @dependencies.setter
+    def dependencies(self, dependencies):
+        if dependencies:
+            self._dependencies = set(dependencies)
+            logger.debug('Set (%s) dependencies to (%s).' % (self, ', '.join(list(dependencies))))
+
+    @property
     def category(self):
         return self._category
 
     @category.setter
     def category(self, category):
         self._category = category
-        logger.debug('Set Infrastructure object (%s) at (0x%x) to \'%s\' Creation Mode.' % (self.__name__, id(self), category.title()))
+        logger.debug('Set (%s) to \'%s\' Creation Mode.' % (self, category.title()))
 
     @property
     def resources(self):

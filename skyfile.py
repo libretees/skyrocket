@@ -20,12 +20,12 @@ def database():
     print('test', ready['network']['public_subnets'])
 
 @ephemeral
-@infrastructure(requires=['network', 'database'])
+@infrastructure(requires=['network', 'database', 'load_balancer'])
 def application():
     print('make application')
 
-@ephemeral
-@infrastructure(requires=['network', 'application'])
+@permanent
+@infrastructure(requires=['network'])
 def load_balancer():
     print('make load_balancer')
 
