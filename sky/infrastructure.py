@@ -6,12 +6,11 @@ logger = logging.getLogger(__name__)
 
 class Infrastructure(object):
 
-    wrapped = None
-    environment = None
+    _wrapped = None
     _dependencies = None
     _category = None
     _original_creation_mode = None
-    _resources = {}
+    _locals = None
     _result = None
 
     def __init__(self, callable_, *args, **kwargs):
@@ -19,7 +18,7 @@ class Infrastructure(object):
         self.__doc__ = callable_.__doc__ if hasattr(callable_, '__doc__') else None
         self.__module__ = callable_.__module__ if hasattr(callable_, '__module__') else None
 
-        self.wrapped = callable_
+        self._wrapped = callable_
         self.environment = kwargs.get('environment', None)
         self.dependencies = kwargs.get('requires', None)
 
@@ -34,13 +33,13 @@ class Infrastructure(object):
         # Define a source code profiler.
         def profiler(frame, event, arg):
             if event == 'return':
-                self._resources = frame.f_locals.copy()
+                self._locals = frame.f_locals.copy()
 
         # Activate the profiler on the next call, return or exception.
         sys.setprofile(profiler)
         try:
             # Trace the function call.
-            self._result = self.wrapped(*args, **kwargs)
+            self._result = self._wrapped(*args, **kwargs)
         finally:
             # Disable the source code profiler.
             sys.setprofile(None)
@@ -50,8 +49,8 @@ class Infrastructure(object):
 
         return self._result
 
-    def __getitem__(self, name):
-        return self._resources[name]
+    def __getattr__(self, attr):
+            return self._locals[attr]
 
     def _set_creation_mode(self):
         global CREATION_MODE
@@ -89,7 +88,7 @@ class Infrastructure(object):
 
     @property
     def resources(self):
-        return self._resources
+        return self._locals
 
     @property
     def result(self):
