@@ -66,6 +66,9 @@ def build_dependency_graph(nodes):
     # Create a copy of the nodes list to work with.
     nodes = list(nodes)
 
+    # Store the length of the nodes list, so that circular dependencies can be detected.
+    original_count = len(nodes)
+
     # Determine independent nodes.
     independent_nodes = [node for node in nodes if not node.dependencies]
 
@@ -88,6 +91,14 @@ def build_dependency_graph(nodes):
 
         # Build graph from the independent nodes to the most-dependent nodes.
         graph.insert(0, independent_nodes)
+
+    # Check for circular dependencies.
+    count = 0
+    for depth in graph:
+        for breadth in depth:
+            count += 1
+    if original_count != count:
+        raise RuntimeError('Circular dependencies detected.')
 
     return graph
 
