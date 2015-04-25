@@ -17,7 +17,7 @@ def network():
 @infrastructure(requires=['network'])
 def database():
     print('make database')
-    print('test', ready['network']['public_subnets'])
+    print('test', ready.network.public_subnets)
 
 @ephemeral
 @infrastructure(requires=['network', 'database', 'load_balancer'])

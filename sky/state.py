@@ -3,7 +3,15 @@ import sys
 import logging
 from .utils import parse_arguments
 
-ready = {}
+class Ready(dict):
+
+    def __init__(self):
+        super(Ready, self).__init__()
+
+    def __getattr__(self, attr):
+        return self[attr]
+
+ready = Ready()
 
 CREATION_MODE = None
 EPHEMERAL = 'ephemeral'
