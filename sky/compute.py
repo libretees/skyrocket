@@ -5,14 +5,14 @@ import logging
 from operator import itemgetter
 import boto
 from .networking import connect_vpc, create_route_table
-from .state import PROJECT_NAME, ENVIRONMENT, AWS_ACCESS_KEY_ID, AWS_SECRET_ACCESS_KEY
+from .state import config
 
 logger = logging.getLogger(__name__)
 
 def connect_ec2():
     logger.debug('Connecting to the Amazon Elastic Compute Cloud (Amazon EC2) service.')
-    ec2 = boto.connect_ec2(aws_access_key_id=AWS_ACCESS_KEY_ID,
-                           aws_secret_access_key=AWS_SECRET_ACCESS_KEY)
+    ec2 = boto.connect_ec2(aws_access_key_id=config['AWS_ACCESS_KEY_ID'],
+                           aws_secret_access_key=config['AWS_SECRET_ACCESS_KEY'])
     logger.debug('Connected to Amazon EC2.')
 
     return ec2
@@ -23,7 +23,7 @@ def create_security_group(vpc, name=None, allowed_inbound_traffic=None, allowed_
 
     # Generate Security Group name.
     if not name:
-        name = '-'.join(['gp', PROJECT_NAME, ENVIRONMENT])
+        name = '-'.join(['gp', config['PROJECT_NAME'], config['ENVIRONMENT']])
 
     if not allowed_inbound_traffic:
         allowed_inbound_traffic = []
@@ -91,8 +91,8 @@ def create_security_group(vpc, name=None, allowed_inbound_traffic=None, allowed_
     while not tagged:
         try:
             tagged = ec2_connection.create_tags(security_group.id, {'Name': name,
-                                                                    'Project': PROJECT_NAME,
-                                                                    'Environment': ENVIRONMENT,})
+                                                                    'Project': config['PROJECT_NAME'],
+                                                                    'Environment': config['ENVIRONMENT'],})
         except boto.exception.EC2ResponseError as error:
             if error.code == 'InvalidID': # Security Group hasn't registered with EC2 service yet.
                 pass
@@ -109,7 +109,7 @@ def create_load_balancer(vpc, subnets, name=None, security_groups=None, ssl_cert
 
     # Set up default security group, if necessary
     if not security_groups:
-        security_group_name = '-'.join(['gp', PROJECT_NAME, ENVIRONMENT, 'elb'])
+        security_group_name = '-'.join(['gp', config['PROJECT_NAME'], config['ENVIRONMENT'], 'elb'])
         security_groups = [create_security_group(vpc,
                                                  name=security_group_name,
                                                  allowed_inbound_traffic=[('HTTP',   '0.0.0.0/0')
@@ -120,7 +120,7 @@ def create_load_balancer(vpc, subnets, name=None, security_groups=None, ssl_cert
 
     # Generate Elastic Load Balancer (ELB) name.
     if not name:
-        name = '-'.join(['elb', PROJECT_NAME, ENVIRONMENT])
+        name = '-'.join(['elb', config['PROJECT_NAME'], config['ENVIRONMENT']])
 
     # Delete existing Elastic Load Balancer (ELB).
     logger.info('Deleting Elastic Load Balancer (%s).' % name)
@@ -178,7 +178,7 @@ def create_nat_instance(vpc, public_subnet, private_subnet, name=None, security_
 
     # Create Security Group, if one was not specified.
     if not security_groups:
-        sg_name = '-'.join(['gp', PROJECT_NAME, ENVIRONMENT, public_subnet.availability_zone, 'nat'])
+        sg_name = '-'.join(['gp', config['PROJECT_NAME'], config['ENVIRONMENT'], public_subnet.availability_zone, 'nat'])
         security_groups = [create_security_group(vpc, name=sg_name
                                                     , allowed_inbound_traffic=[('HTTP',   private_subnet.cidr_block)
                                                                               ,('HTTPS',  private_subnet.cidr_block)]
@@ -192,7 +192,7 @@ def create_nat_instance(vpc, public_subnet, private_subnet, name=None, security_
 
     # Generate name, if one was not specified.
     if not name:
-        name = '-'.join(['ec2', PROJECT_NAME, ENVIRONMENT, public_subnet.availability_zone, 'nat'])
+        name = '-'.join(['ec2', config['PROJECT_NAME'], config['ENVIRONMENT'], public_subnet.availability_zone, 'nat'])
 
     # Create NAT Instance.
     nat_instance = create_instance(public_subnet, name=name, role='nat', security_groups=security_groups, image_id=image_id.id, internet_addressable=True)[0]
@@ -201,7 +201,7 @@ def create_nat_instance(vpc, public_subnet, private_subnet, name=None, security_
     ec2_connection.modify_instance_attribute(nat_instance.id, attribute='sourceDestCheck', value=False, dry_run=False)
 
     # Create Route table.
-    route_table_name = '-'.join(['rtb', PROJECT_NAME, ENVIRONMENT, public_subnet.availability_zone, 'private'])
+    route_table_name = '-'.join(['rtb', config['PROJECT_NAME'], config['ENVIRONMENT'], public_subnet.availability_zone, 'private'])
     route_table = create_route_table(vpc, name=route_table_name, internet_access=False)
 
     # Wait for NAT instance to run.
@@ -291,7 +291,7 @@ def create_instance(subnet, name=None, role=None, security_groups=None, script=N
     # Generate EC2 Instance name, if one was not specified.
     if not name:
         random_id = '{:08x}'.format(random.randrange(2**32))
-        name = '-'.join(['ec2', PROJECT_NAME, ENVIRONMENT, random_id])
+        name = '-'.join(['ec2', config['PROJECT_NAME'], config['ENVIRONMENT'], random_id])
 
     # Generate Elastic Network Interface (ENI) name.
     eni_name = '-'.join(['eni', name.replace('ec2-', '')])
@@ -319,8 +319,8 @@ def create_instance(subnet, name=None, role=None, security_groups=None, script=N
     while not tagged:
         try:
             tagged = ec2_connection.create_tags([instance.id for instance in instances], {'Name': name,
-                                                                                          'Project': PROJECT_NAME,
-                                                                                          'Environment': ENVIRONMENT,
+                                                                                          'Project': config['PROJECT_NAME'],
+                                                                                          'Environment': config['ENVIRONMENT'],
                                                                                           'Role': role if role else '',})
         except boto.exception.EC2ResponseError as error:
             if error.code == 'InvalidInstanceID.NotFound': # Instance hasn't registered with EC2 service yet.
@@ -344,8 +344,8 @@ def create_instance(subnet, name=None, role=None, security_groups=None, script=N
     while not tagged:
         try:
             tagged = ec2_connection.create_tags([interface.id for interface in interfaces], {'Name': eni_name,
-                                                                                             'Project': PROJECT_NAME,
-                                                                                             'Environment': ENVIRONMENT})
+                                                                                             'Project': config['PROJECT_NAME'],
+                                                                                             'Environment': config['ENVIRONMENT']})
         except boto.exception.EC2ResponseError as error:
             if error.code == 'InvalidNetworkInterfaceID.NotFound': # ENI hasn't registered with EC2 service yet.
                 pass
@@ -388,8 +388,8 @@ def get_instances(role=None):
 
     # Set up filters.
     filters = {}
-    filters['tag:Project'] = PROJECT_NAME
-    filters['tag:Environment'] = ENVIRONMENT
+    filters['tag:Project'] = config['PROJECT_NAME']
+    filters['tag:Environment'] = config['ENVIRONMENT']
     if role:
         filters['tag:Role'] = role
 

@@ -2,14 +2,14 @@ import time
 import random
 import logging
 import boto
-from sky.state import PROJECT_NAME, ENVIRONMENT, AWS_ACCESS_KEY_ID, AWS_SECRET_ACCESS_KEY
+from sky.state import config
 
 logger = logging.getLogger(__name__)
 
 def connect_iam():
     logger.debug('Connecting to the Amazon Identity and Access Management (Amazon IAM) service.')
-    iam = boto.connect_iam(aws_access_key_id=AWS_ACCESS_KEY_ID,
-                           aws_secret_access_key=AWS_SECRET_ACCESS_KEY)
+    iam = boto.connect_iam(aws_access_key_id=config['AWS_ACCESS_KEY_ID'],
+                           aws_secret_access_key=config['AWS_SECRET_ACCESS_KEY'])
     logger.debug('Connected to Amazon IAM.')
 
     return iam
@@ -98,14 +98,14 @@ def create_role(inline_policies):
         inline_policies = [inline_policies]
 
     # Create Role.
-    role_name = '-'.join(['role', PROJECT_NAME, ENVIRONMENT])
+    role_name = '-'.join(['role', config['PROJECT_NAME'], config['ENVIRONMENT']])
     delete_role(role_name)
     logger.info('Creating Role (%s).' % role_name)
     role = iam_connection.create_role(role_name)
     logger.info('Created Role (%s).' % role_name)
 
     # Set up Instance Profile.
-    instance_profile_name = '-'.join(['role', PROJECT_NAME, ENVIRONMENT])
+    instance_profile_name = '-'.join(['role', config['PROJECT_NAME'], config['ENVIRONMENT']])
     instance_profile = iam_connection.create_instance_profile(instance_profile_name)
     instance_profile.name = instance_profile_name
     iam_connection.add_role_to_instance_profile(instance_profile_name, role_name)
@@ -113,7 +113,7 @@ def create_role(inline_policies):
 
     # Attach Inline Policies to Role.
     for inline_policy in inline_policies:
-        role_policy_name = '-'.join(['policy', PROJECT_NAME, ENVIRONMENT, '{:08x}'.format(random.randrange(2**32))])
+        role_policy_name = '-'.join(['policy', config['PROJECT_NAME'], config['ENVIRONMENT'], '{:08x}'.format(random.randrange(2**32))])
         iam_connection.put_role_policy(role_name, role_policy_name, inline_policy)
 
     # Allow time for Role to register with Amazon IAM service.
@@ -126,7 +126,7 @@ def upload_ssl_certificate(public_key, private_key, certificate_chain=None, name
 
     # Generate Certificate name.
     if not name:
-        name = '-'.join(['crt', PROJECT_NAME, ENVIRONMENT])
+        name = '-'.join(['crt', config['PROJECT_NAME'], config['ENVIRONMENT']])
 
     # Read SSL Public Key.
     with open(public_key, 'r') as public_key_file:

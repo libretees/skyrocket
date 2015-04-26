@@ -6,6 +6,7 @@ from argparse import ArgumentParser
 from configparser import ConfigParser
 from timeit import Timer
 from boto import regioninfo
+from sky.state import config
 
 logger = logging.getLogger(__name__)
 
@@ -35,6 +36,8 @@ def configure_logger(args):
     logging.basicConfig(level=numeric_level)
 
 def parse_arguments():
+    global config
+    
     valid_arguments = True
     parser = ArgumentParser(description='Provision Django application environments.')
     parser.add_argument('command', metavar='<command>', action='store', help='Valid commands are [deploy]')
@@ -150,5 +153,12 @@ def parse_arguments():
         logger.error('Invalid arguments given.')
         logger.error('Exiting...')
         sys.exit(1)
+
+    config['PROJECT_NAME'] = os.path.abspath(os.path.expanduser(args.directory)).split(os.sep)[-1].lower()
+    config['PROJECT_DIRECTORY'] = os.path.abspath(os.path.expanduser(args.directory)).lower()
+    config['ENVIRONMENT'] = args.environment.lower()
+    config['AWS_ACCOUNT_ID'] = args.account_id
+    config['AWS_ACCESS_KEY_ID'] = args.key_id
+    config['AWS_SECRET_ACCESS_KEY'] = args.key
 
     return args

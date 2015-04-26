@@ -3,7 +3,7 @@ import time
 import logging
 import boto
 from .compute import create_security_group
-from .state import PROJECT_NAME, ENVIRONMENT, AWS_ACCOUNT_ID, AWS_ACCESS_KEY_ID, AWS_SECRET_ACCESS_KEY
+from .state import config
 
 logger = logging.getLogger(__name__)
 
@@ -33,8 +33,8 @@ INBOUND_PORT = {
 
 def connect_rds():
     logger.debug('Connecting to the Amazon Relational Database Service (Amazon RDS).')
-    rds = boto.connect_rds2(aws_access_key_id=AWS_ACCESS_KEY_ID,
-                            aws_secret_access_key=AWS_SECRET_ACCESS_KEY)
+    rds = boto.connect_rds2(aws_access_key_id=config['AWS_ACCESS_KEY_ID'],
+                            aws_secret_access_key=config['AWS_SECRET_ACCESS_KEY'])
     logger.debug('Connected to Amazon RDS.')
     
     return rds
@@ -49,8 +49,8 @@ def create_db_parameter_group(name=None, engine='postgresql'):
     # Generate Database Parameter Group name.
     if not name:
         name = '-'.join(['pg',
-                         PROJECT_NAME,
-                         ENVIRONMENT,])
+                         config['PROJECT_NAME'],
+                         config['ENVIRONMENT'],])
 
     # Delete existing Database Parameter Group.
     try:
@@ -60,18 +60,18 @@ def create_db_parameter_group(name=None, engine='postgresql'):
 
     db_parameter_group = rds_connection.create_db_parameter_group(name,                                                    # db_parameter_group_name
                                                                   ENGINE[engine],                                          # db_parameter_group_family
-                                                                  description=' '.join([PROJECT_NAME, 'Parameter Group'])) # description
+                                                                  description=' '.join([config['PROJECT_NAME'], 'Parameter Group'])) # description
 
     # Construct Database Parameter Group ARN.
     region = 'us-east-1'
-    db_parameter_group_arn = 'arn:aws:rds:%s:%s:pg:%s' % (region, AWS_ACCOUNT_ID, name)
+    db_parameter_group_arn = 'arn:aws:rds:%s:%s:pg:%s' % (region, config['AWS_ACCOUNT_ID'], name)
 
     # Tag Database Subnet Group.
     logger.debug('Tagging Amazon RDS Resource (%s).' % db_parameter_group_arn)
     rds_connection.add_tags_to_resource(db_parameter_group_arn,           # resource_name
                                         [('Name'       , name         ),  # tags
-                                         ('Project'    , PROJECT_NAME ),
-                                         ('Environment', ENVIRONMENT  )])
+                                         ('Project'    , config['PROJECT_NAME'] ),
+                                         ('Environment', config['ENVIRONMENT']  )])
     logger.debug('Tagged Amazon RDS Resource (%s).' % db_parameter_group_arn)
 
     return db_parameter_group
@@ -83,8 +83,8 @@ def create_db_subnet_group(subnets, name=None):
     # Generate Database Subnet Group name.
     if not name:
         name = '-'.join(['subgrp',
-                         PROJECT_NAME,
-                         ENVIRONMENT,])
+                         config['PROJECT_NAME'],
+                         config['ENVIRONMENT'],])
 
     # Delte existing Database Subnet Group.
     try:
@@ -97,7 +97,7 @@ def create_db_subnet_group(subnets, name=None):
     subnet = None
     try:
         subnet = rds_connection.create_db_subnet_group(name,                                        #db_subnet_group_name
-                                                       ' '.join([PROJECT_NAME, 'DB Subnet Group']), #db_subnet_group_description
+                                                       ' '.join([config['PROJECT_NAME'], 'DB Subnet Group']), #db_subnet_group_description
                                                        [subnet.id for subnet in subnets])           #subnet_ids
     except boto.rds2.exceptions.DBSubnetGroupAlreadyExists as error:
         if error.code == 'DBSubnetGroupAlreadyExists':
@@ -105,14 +105,14 @@ def create_db_subnet_group(subnets, name=None):
 
     # Construct Database Subnet Group ARN.
     region = 'us-east-1'
-    db_subnet_group_arn = 'arn:aws:rds:%s:%s:subgrp:%s' % (region, AWS_ACCOUNT_ID, name)
+    db_subnet_group_arn = 'arn:aws:rds:%s:%s:subgrp:%s' % (region, config['AWS_ACCOUNT_ID'], name)
 
     # Tag Database Subnet Group.
     logger.debug('Tagging Amazon RDS Resource (%s).' % db_subnet_group_arn)
     rds_connection.add_tags_to_resource(db_subnet_group_arn,              # resource_name
                                         [('Name'       , name         ),  # tags
-                                         ('Project'    , PROJECT_NAME ),
-                                         ('Environment', ENVIRONMENT  )])
+                                         ('Project'    , config['PROJECT_NAME'] ),
+                                         ('Environment', config['ENVIRONMENT']  )])
     logger.debug('Tagged Amazon RDS Resource (%s).' % db_subnet_group_arn)
 
     return subnet
@@ -124,8 +124,8 @@ def create_option_group(name=None, engine='postgresql'):
     # Generate Option Group name.
     if not name:
         name = '-'.join(['og',
-                         PROJECT_NAME,
-                         ENVIRONMENT,])
+                         config['PROJECT_NAME'],
+                         config['ENVIRONMENT'],])
 
     # Delete Option Group.
     try:
@@ -140,19 +140,19 @@ def create_option_group(name=None, engine='postgresql'):
     option_group = rds_connection.create_option_group(name,                                     # option_group_name
                                                       ENGINE_NAME[engine],                      # engine_name
                                                       MAJOR_ENGINE_VERSION[engine],             # major_engine_version
-                                                      ' '.join([PROJECT_NAME, 'Option Group']), # option_group_description
+                                                      ' '.join([config['PROJECT_NAME'], 'Option Group']), # option_group_description
                                                       tags=None)
 
     # Construct Option Group ARN.
     region = 'us-east-1'
-    option_group_arn = 'arn:aws:rds:%s:%s:og:%s' % (region, AWS_ACCOUNT_ID, name)
+    option_group_arn = 'arn:aws:rds:%s:%s:og:%s' % (region, config['AWS_ACCOUNT_ID'], name)
 
     # Tag Option Group.
     logger.debug('Tagging Amazon RDS Resource (%s).' % option_group_arn)
     rds_connection.add_tags_to_resource(option_group_arn   ,              # resource_name
                                         [('Name'       , name         ),  # tags
-                                         ('Project'    , PROJECT_NAME ),
-                                         ('Environment', ENVIRONMENT  )])
+                                         ('Project'    , config['PROJECT_NAME'] ),
+                                         ('Environment', config['ENVIRONMENT']  )])
     logger.debug('Tagged Amazon RDS Resource (%s).' % option_group_arn)
 
     return option_group
@@ -165,8 +165,8 @@ def create_database(vpc, subnets, name=None, engine='postgresql', application_in
 
     if not name:
         name = '-'.join(['db',
-                         PROJECT_NAME,
-                         ENVIRONMENT,])
+                         config['PROJECT_NAME'],
+                         config['ENVIRONMENT'],])
 
     if not db_parameter_group:
         db_parameter_group = create_db_parameter_group(engine=engine)
@@ -198,7 +198,7 @@ def create_database(vpc, subnets, name=None, engine='postgresql', application_in
                 inbound_rule = ('TCP:' + str(INBOUND_PORT[engine]), application_security_group_id)
                 inbound_rules.append(inbound_rule)
 
-        sg_name = '-'.join(['gp', PROJECT_NAME, ENVIRONMENT, 'db'])
+        sg_name = '-'.join(['gp', config['PROJECT_NAME'], config['ENVIRONMENT'], 'db'])
         security_groups = [create_security_group(vpc, name=sg_name
                                                     , allowed_inbound_traffic=inbound_rules if application_instances else None
                                                     , allowed_outbound_traffic=[('HTTP',  '0.0.0.0/0')
@@ -233,14 +233,14 @@ def create_database(vpc, subnets, name=None, engine='postgresql', application_in
 
     # Construct Database Instance ARN.
     region = 'us-east-1'
-    database_arn = 'arn:aws:rds:%s:%s:db:%s' % (region, AWS_ACCOUNT_ID, name)
+    database_arn = 'arn:aws:rds:%s:%s:db:%s' % (region, config['AWS_ACCOUNT_ID'], name)
 
     # Tag Database Instance.
     logger.debug('Tagging Amazon RDS Resource (%s).' % database_arn)
     rds_connection.add_tags_to_resource(database_arn,                     # resource_name
                                         [('Name'       , name         ),  # tags
-                                         ('Project'    , PROJECT_NAME ),
-                                         ('Environment', ENVIRONMENT  )])
+                                         ('Project'    , config['PROJECT_NAME'] ),
+                                         ('Environment', config['ENVIRONMENT']  )])
     logger.debug('Tagged Amazon RDS Resource (%s).' % database_arn)
 
     # Get Database Endpoint.

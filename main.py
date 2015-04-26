@@ -4,10 +4,11 @@
 
 import os
 import sys
-import importlib
 import types
 from string import Template
 import logging
+import importlib
+from sky.utils import parse_arguments
 from sky.infrastructure import Infrastructure
 from sky.state import ready
 
@@ -103,7 +104,7 @@ def build_dependency_graph(nodes):
     return graph
 
 def main():
-
+    parse_arguments()
     module = load_skyfile()
     infrastructure = load_infrastructure(module)
 
