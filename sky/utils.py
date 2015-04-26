@@ -25,6 +25,12 @@ def get_closest_region(service='ec2', repetitions=1):
     region = min(latency, key=latency.get)
     return region
 
+def make_tarfile(output_filename, source_dir):
+    logger.info('Archiving directory (%s).' % source_dir)
+    with tarfile.open(output_filename, "w:gz") as tar:
+        tar.add(source_dir, arcname='.')
+    logger.info('Created gzipped tarball (%s).' % output_filename)
+
 def configure_logger(args):
     # Restrict the boto logger to the WARNING log level.
     if args.loglevel.upper() in ['DEBUG', 'INFO', 'WARNING']:
