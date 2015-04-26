@@ -1,6 +1,6 @@
 #!/usr/bin/env python
 # -*- coding: utf-8 -*-
-"""canvas.py: Provision AWS environments quickly."""
+"""main.py: Provision AWS environments quickly."""
 
 import os
 import sys
@@ -8,9 +8,9 @@ import types
 from string import Template
 import logging
 import importlib
-from sky.utils import parse_arguments
-from sky.infrastructure import Infrastructure
-from sky.state import ready
+from .utils import parse_arguments
+from .infrastructure import Infrastructure
+from .state import ready
 
 __author__ = 'Jared Contrascere'
 __copyright__ = 'Copyright 2015, LibreTees, LLC'
