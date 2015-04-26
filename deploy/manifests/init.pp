@@ -1,2 +1,0 @@
-class { lockdown: }
-class { nginx: }
