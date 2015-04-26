@@ -54,13 +54,14 @@ def validate_cidr_block(cidr_block):
         return False
 
 def create_network(name=None, internet_connected=False, **kwargs):
-    import ec2
-    
+    # Deferred import to resolve interdependency between sky.networking and sky.compute modules.
+    from .compute import connect_ec2
+
     # Connect to the Amazon Virtual Private Cloud (Amazon VPC) service.
     vpc_connection = connect_vpc()
 
     # Connect to the Amazon Elastic Compute Cloud (Amazon EC2) service.
-    ec2_connection = ec2.connect_ec2()
+    ec2_connection = connect_ec2()
 
     if 'cidr_block' in kwargs:
         cidr_block = kwargs['cidr_block']
@@ -177,13 +178,14 @@ def create_network(name=None, internet_connected=False, **kwargs):
     return network
 
 def attach_internet_gateway(vpc):
-    import ec2
-    
+    # Deferred import to resolve interdependency between sky.networking and sky.compute modules.
+    from .compute import connect_ec2
+
     # Connect to the Amazon Virtual Private Cloud (Amazon VPC) service.
     vpc_connection = connect_vpc()
 
     # Connect to the Amazon Elastic Compute Cloud (Amazon EC2) service.
-    ec2_connection = ec2.connect_ec2()
+    ec2_connection = connect_ec2()
 
     # Create Internet Gateway.
     internet_gateway = vpc_connection.create_internet_gateway(dry_run=False)
@@ -220,13 +222,14 @@ def attach_internet_gateway(vpc):
     return internet_gateway
 
 def create_route_table(vpc, name=None, internet_access=False):
-    import ec2
+    # Deferred import to resolve interdependency between sky.networking and sky.compute modules.
+    from .compute import connect_ec2
     
     # Connect to the Amazon Virtual Private Cloud (Amazon VPC) service.
     vpc_connection = connect_vpc()
 
     # Connect to the Amazon Elastic Compute Cloud (Amazon EC2) service.
-    ec2_connection = ec2.connect_ec2()
+    ec2_connection = connect_ec2()
 
     # Create Route Table.
     route_table = vpc_connection.create_route_table(vpc.id)
@@ -283,22 +286,23 @@ def create_route_table(vpc, name=None, internet_access=False):
                                                                    'Environment': ENVIRONMENT,
                                                                    'Type': 'public' if internet_access else 'private',})
         except boto.exception.EC2ResponseError as error:
-            if error.code == 'InvalidID': # Route Table hasn't registered with Virtual Private Cloud (VPC) service yet.
+            if error.code == 'InvalidRouteTableID.NotFound': # Route Table hasn't registered with Virtual Private Cloud (VPC) service yet.
                 pass
             else:
-                raise boto.exception.EC2ResponseError
+                raise boto.exception.EC2ResponseError(error.status, error.reason)
 
     logger.info('Created Route Table (%s).' % route_table.name)
     return route_table
 
 def create_subnets(vpc, zones='All', count=1, byte_aligned=False, balanced=False, public=False):
-    import ec2
+    # Deferred import to resolve interdependency between sky.networking and sky.compute modules.
+    from .compute import connect_ec2
     
     # Connect to the Amazon Virtual Private Cloud (Amazon VPC) service.
     vpc_connection = connect_vpc()
 
     # Connect to the Amazon Elastic Compute Cloud (Amazon EC2) service.
-    ec2_connection = ec2.connect_ec2()
+    ec2_connection = connect_ec2()
 
     # Break CIDR block into IP and Netmask components.
     network_ip, netmask = get_cidr_block_components(vpc.cidr_block)
@@ -357,9 +361,9 @@ def create_subnets(vpc, zones='All', count=1, byte_aligned=False, balanced=False
                 shortened['subnet_type'] = True
                 continue
             if not shortened['environment']:
-                if core.args.environment.lower() == 'prod':
+                if ENVIRONMENT == 'prod':
                     subnet_name = subnet_name.replace('prod', 'prd')
-                elif core.args.environment.lower() == 'staging':
+                elif ENVIRONMENT == 'staging':
                     subnet_name = subnet_name.replace('staging', 'stg')
                 shortened['environment'] = True
                 continue
@@ -383,13 +387,14 @@ def create_subnets(vpc, zones='All', count=1, byte_aligned=False, balanced=False
     return subnets
 
 def create_subnet(vpc, zone, cidr_block, subnet_name=None, route_table=None):
-    import ec2
+    # Deferred import to resolve interdependency between sky.networking and sky.compute modules.
+    from .compute import connect_ec2
     
     # Connect to the Amazon Virtual Private Cloud (Amazon VPC) service.
     vpc_connection = connect_vpc()
 
     # Connect to the Amazon Elastic Compute Cloud (Amazon EC2) service.
-    ec2_connection = ec2.connect_ec2()
+    ec2_connection = connect_ec2()
 
     # Break CIDR block into IP and Netmask components.
     network_ip, netmask = get_cidr_block_components(cidr_block)
