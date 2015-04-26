@@ -1,9 +1,9 @@
-from sky.api import permanent, ephemeral, infrastructure, ready
+from sky.api import permanent, ephemeral, ready, infrastructure
 from sky.networking import create_network, create_subnets
-from sky.compute import get_instances, create_instances, terminate_instances, create_nat_instances, create_security_group, create_load_balancer, register_instances
+from sky.compute import (get_instances, create_instances, create_nat_instances, terminate_instances,
+                         create_security_group, create_load_balancer, register_instances)
 from sky.database import create_database
 from sky.security import upload_ssl_certificate
-from sky.state import config
 
 @permanent
 @infrastructure
