@@ -1,6 +1,6 @@
 #!/usr/bin/env python
 # -*- coding: utf-8 -*-
-"""canvas.py: Provision AWS environments for Django projects."""
+"""canvas.py: Provision AWS environments quickly."""
 
 import os
 import sys
@@ -113,31 +113,6 @@ def main():
         for dependency in dependencies:
             dependency()
             ready[dependency.__name__] = dependency
-            print(dependency.__name__, 'resources:', dependency.resources)
-
-    #print(graph)
-
-    # for component in infrastructure:
-    #     print(component.__name__, component.requires)
-    #     component()
-
-
-    # instances = ec2.create_ec2_instances(public_vpc, public_subnets, role='application', internet_addressable=True)
-    # nat_instances = ec2.create_nat_instances(public_vpc, public_subnets, private_subnets)
-
-    # database = rds.create_database(public_vpc, private_subnets, application_instances=instances, publicly_accessible=False, multi_az=True)
-    # print('Database Endpoint:', database['Endpoint'])
-
-    # ssl_certificate = iam.upload_ssl_certificate('public-key.crt',
-    #                                              'private-key.pem',
-    #                                              certificate_chain='certificate-chain.pem')
-
-    # instance_security_groups = [group for instance in instances for group in instance.groups]
-    # load_balancer = ec2.create_elb(public_vpc, public_subnets, ssl_certificate=ssl_certificate, security_groups=instance_security_groups)
-
-    # logger.info('Registering EC2 Instances with Elastic Load Balancer (%s).' % load_balancer.name)
-    # elb_connection.register_instances(load_balancer.name, [instance.id for instance in instances])
-    # logger.info('Registered EC2 Instances with Elastic Load Balancer (%s).' % load_balancer.name)
 
     # archive_name = '.'.join([s3.PROJECT_NAME, 'tar', 'gz'])
     # logger.info('Creating deployment archive (%s).' % archive_name)
@@ -158,19 +133,6 @@ def main():
     # script = ec2.run(script, 'pip3 install virtualenvwrapper')
 
     # instance_profile_name = iam.create_role(policy)
-
-    # # Get created EC2 instances.
-    # reservations = ec2_connection.get_all_instances(filters={'tag:Project': core.PROJECT_NAME.lower(),
-    #                                                          'tag:Environment': core.args.environment.lower()})
-    # instances = [instances for reservation in reservations for instances in reservation.instances]
-
-    # # Terminate EC2 instances.
-    # ec2_connection.terminate_instances(instance_ids=[instance.id for instance in instances])
-
-    # curl http://169.254.169.254/latest/meta-data/iam/security-credentials/myrole
-    # aws s3 cp --region us-east-1 s3://s3-gossamer-staging-faddde2b/gossamer.tar.gz gossamer.tar.gz
-
-
 
 if __name__ == '__main__':
     main()
