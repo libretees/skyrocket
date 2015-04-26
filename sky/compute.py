@@ -4,10 +4,8 @@ import random
 import logging
 from operator import itemgetter
 import boto
-import iam
-import ec2
-import sky.networking as vpc_pkg
-from sky.state import PROJECT_NAME, ENVIRONMENT, AWS_ACCESS_KEY_ID, AWS_SECRET_ACCESS_KEY
+from .networking import connect_vpc, create_route_table
+from .state import PROJECT_NAME, ENVIRONMENT, AWS_ACCESS_KEY_ID, AWS_SECRET_ACCESS_KEY
 
 logger = logging.getLogger(__name__)
 
@@ -103,14 +101,22 @@ def create_security_group(vpc, name=None, allowed_inbound_traffic=None, allowed_
 
     return security_group
 
-def create_elb(vpc, subnets, name=None, security_groups=None, ssl_certificate=None):
+def create_load_balancer(vpc, subnets, name=None, security_groups=None, ssl_certificate=None):
     # Connect to the Amazon EC2 Load Balancing (Amazon ELB) service.
-    logger.info('Connecting to the Amazon EC2 Load Balancing (Amazon ELB) service.')
+    logger.debug('Connecting to the Amazon EC2 Load Balancing (Amazon ELB) service.')
     elb_connection = boto.connect_elb()
-    logger.info('Connected to the Amazon EC2 Load Balancing (Amazon ELB) service.')
+    logger.debug('Connected to the Amazon EC2 Load Balancing (Amazon ELB) service.')
 
-    # Connect to the Amazon Elastic Compute Cloud (Amazon EC2) service.
-    ec2_connection = ec2.connect_ec2()
+    # Set up default security group, if necessary
+    if not security_groups:
+        security_group_name = '-'.join(['gp', PROJECT_NAME, ENVIRONMENT, 'elb'])
+        security_groups = [create_security_group(vpc,
+                                                 name=security_group_name,
+                                                 allowed_inbound_traffic=[('HTTP',   '0.0.0.0/0')
+                                                                         ,('HTTPS',  '0.0.0.0/0')],
+                                                 allowed_outbound_traffic=[('HTTP',  '0.0.0.0/0')
+                                                                          ,('HTTPS', '0.0.0.0/0')
+                                                                          ,('DNS',   '0.0.0.0/0')])]
 
     # Generate Elastic Load Balancer (ELB) name.
     if not name:
@@ -129,7 +135,7 @@ def create_elb(vpc, subnets, name=None, security_groups=None, ssl_certificate=No
 
     # Create Security Group.
     if not security_groups:
-        security_groups = ec2.create_security_group(vpc)
+        security_groups = create_security_group(vpc)
 
     listeners = [(80, 80, 'HTTP')]
     if ssl_certificate:
@@ -168,7 +174,7 @@ def create_nat_instance(vpc, public_subnet, private_subnet, name=None, security_
     ec2_connection = connect_ec2()
 
     # Connect to the Amazon Virtual Private Cloud (Amazon VPC) service.
-    vpc_connection = vpc_pkg.connect_vpc()
+    vpc_connection = connect_vpc()
 
     # Create Security Group, if one was not specified.
     if not security_groups:
@@ -189,14 +195,14 @@ def create_nat_instance(vpc, public_subnet, private_subnet, name=None, security_
         name = '-'.join(['ec2', PROJECT_NAME, ENVIRONMENT, public_subnet.availability_zone, 'nat'])
 
     # Create NAT Instance.
-    nat_instance = create_ec2_instance(public_subnet, name=name, role='nat', security_groups=security_groups, image_id=image_id.id, internet_addressable=True)[0]
+    nat_instance = create_instance(public_subnet, name=name, role='nat', security_groups=security_groups, image_id=image_id.id, internet_addressable=True)[0]
 
     # Disable source/destination checking.
     ec2_connection.modify_instance_attribute(nat_instance.id, attribute='sourceDestCheck', value=False, dry_run=False)
 
     # Create Route table.
     route_table_name = '-'.join(['rtb', PROJECT_NAME, ENVIRONMENT, public_subnet.availability_zone, 'private'])
-    route_table = vpc_pkg.create_route_table(vpc, name=route_table_name, internet_access=False)
+    route_table = create_route_table(vpc, name=route_table_name, internet_access=False)
 
     # Wait for NAT instance to run.
     while (nat_instance.state == 'pending'):
@@ -246,7 +252,7 @@ def create_nat_instance(vpc, public_subnet, private_subnet, name=None, security_
 
     return nat_instance
 
-def create_ec2_instances(vpc, subnets, role=None, security_groups=None, script=None, instance_profile=None, os='ubuntu', image_id=None, internet_addressable=False):
+def create_instances(vpc, subnets, role=None, security_groups=None, script=None, instance_profile=None, os='ubuntu', image_id=None, internet_addressable=False):
     # Create a security group, if a security group was not specified.
     if not security_groups:
         security_groups = [create_security_group(vpc, allowed_inbound_traffic=[('HTTP',   '0.0.0.0/0')
@@ -258,11 +264,11 @@ def create_ec2_instances(vpc, subnets, role=None, security_groups=None, script=N
     # Create EC2 instances.
     instances = list()
     for subnet in subnets:
-        instance = create_ec2_instance(subnet, role=role, security_groups=security_groups, script=script, instance_profile=instance_profile, os=os, image_id=image_id, internet_addressable=internet_addressable)
+        instance = create_instance(subnet, role=role, security_groups=security_groups, script=script, instance_profile=instance_profile, os=os, image_id=image_id, internet_addressable=internet_addressable)
         instances = instances + instance
     return instances
 
-def create_ec2_instance(subnet, name=None, role=None, security_groups=None, script=None, instance_profile=None, os='ubuntu', image_id=None, internet_addressable=False):
+def create_instance(subnet, name=None, role=None, security_groups=None, script=None, instance_profile=None, os='ubuntu', image_id=None, internet_addressable=False):
     # Set up dictionary of OSes and their associated quick-start Amazon Machine Images (AMIs).
     ami = {
         'amazon-linux': 'ami-146e2a7c',
@@ -367,3 +373,38 @@ def run(script, command):
 def install_package(script, package_name):
     script += '\n' + 'apt-get --yes --quiet install %s' % package_name
     return script
+
+def register_instances(load_balancer, servers):
+    # Connect to the Amazon EC2 Load Balancing (Amazon ELB) service.
+    logger.debug('Connecting to the Amazon EC2 Load Balancing (Amazon ELB) service.')
+    elb_connection = boto.connect_elb()
+    logger.debug('Connected to the Amazon EC2 Load Balancing (Amazon ELB) service.')
+
+    elb_connection.register_instances(load_balancer.name, [server.id for server in servers])
+
+def get_instances(role=None):
+    # Connect to the Amazon Elastic Compute Cloud (Amazon EC2) service.
+    ec2_connection = connect_ec2()
+
+    # Set up filters.
+    filters = {}
+    filters['tag:Project'] = PROJECT_NAME
+    filters['tag:Environment'] = ENVIRONMENT
+    if role:
+        filters['tag:Role'] = role
+
+    # Get reservations by tag.
+    reservations = ec2_connection.get_all_instances(filters=filters)
+    
+    # Get instances from reservations.
+    instances = [instance for reservation in reservations for instance in reservation.instances]
+    
+    return instances
+    
+def terminate_instances(instances):
+    # Connect to the Amazon Elastic Compute Cloud (Amazon EC2) service.
+    ec2_connection = connect_ec2()
+    
+    # Terminate EC2 instances.
+    if instances:
+        ec2_connection.terminate_instances(instance_ids=[instance.id for instance in instances])
