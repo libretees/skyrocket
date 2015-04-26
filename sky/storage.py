@@ -3,31 +3,21 @@ import tarfile
 import random
 import logging
 import boto
-import core
-
-PROJECT_NAME = core.PROJECT_NAME
-PROJECT_DIRECTORY = core.PROJECT_DIRECTORY
-#DJANGO_ENGINE = core.settings.DATABASES['default']['ENGINE']
+from .state import config
 
 logger = logging.getLogger(__name__)
 
 def connect_s3():
     logger.debug('Connecting to the Amazon Simple Storage Service (Amazon S3).')
-    s3 = boto.connect_s3(aws_access_key_id=core.args.key_id,
-                         aws_secret_access_key=core.args.key)
+    s3 = boto.connect_s3(aws_access_key_id=config['AWS_ACCESS_KEY_ID'],
+                         aws_secret_access_key=config['AWS_SECRET_ACCESS_KEY'])
     logger.debug('Connected to Amazon S3.')
 
     return s3
 
-def make_tarfile(output_filename, source_dir):
-    logger.info('Archiving directory (%s).' % source_dir)
-    with tarfile.open(output_filename, "w:gz") as tar:
-        tar.add(source_dir, arcname='.')
-    logger.info('Created gzipped tarball (%s).' % output_filename)
-
 def create_bucket():
     s3_connection = connect_s3()
-    s3_bucket_name = '-'.join(['s3', core.PROJECT_NAME.lower(), core.args.environment.lower(), '%x' % random.randrange(2**32)])
+    s3_bucket_name = '-'.join(['s3', config['PROJECT_NAME'], config['ENVIRONMENT'], '%x' % random.randrange(2**32)])
     lifecycle_config = boto.s3.lifecycle.Lifecycle()
     lifecycle_config.add_rule(status='Enabled', expiration=1)
     bucket = s3_connection.lookup(s3_bucket_name)
