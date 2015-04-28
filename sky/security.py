@@ -2,7 +2,7 @@ import time
 import random
 import logging
 import boto
-from sky.state import config
+from .state import config
 
 logger = logging.getLogger(__name__)
 

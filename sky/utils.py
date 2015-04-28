@@ -6,7 +6,7 @@ from argparse import ArgumentParser
 from configparser import ConfigParser
 from timeit import Timer
 from boto import regioninfo
-from sky.state import config
+from .state import config
 
 logger = logging.getLogger(__name__)
 

@@ -54,7 +54,7 @@ def validate_cidr_block(cidr_block):
         return False
 
 def create_network(name=None, internet_connected=False, **kwargs):
-    # Deferred import to resolve interdependency between sky.networking and sky.compute modules.
+    # Deferred import to resolve interdependency between .networking and .compute modules.
     from .compute import connect_ec2
 
     # Connect to the Amazon Virtual Private Cloud (Amazon VPC) service.
@@ -178,7 +178,7 @@ def create_network(name=None, internet_connected=False, **kwargs):
     return network
 
 def attach_internet_gateway(vpc):
-    # Deferred import to resolve interdependency between sky.networking and sky.compute modules.
+    # Deferred import to resolve interdependency between .networking and .compute modules.
     from .compute import connect_ec2
 
     # Connect to the Amazon Virtual Private Cloud (Amazon VPC) service.
@@ -222,7 +222,7 @@ def attach_internet_gateway(vpc):
     return internet_gateway
 
 def create_route_table(vpc, name=None, internet_access=False):
-    # Deferred import to resolve interdependency between sky.networking and sky.compute modules.
+    # Deferred import to resolve interdependency between .networking and .compute modules.
     from .compute import connect_ec2
     
     # Connect to the Amazon Virtual Private Cloud (Amazon VPC) service.
@@ -295,7 +295,7 @@ def create_route_table(vpc, name=None, internet_access=False):
     return route_table
 
 def create_subnets(vpc, zones='All', count=1, byte_aligned=False, balanced=False, public=False):
-    # Deferred import to resolve interdependency between sky.networking and sky.compute modules.
+    # Deferred import to resolve interdependency between .networking and .compute modules.
     from .compute import connect_ec2
     
     # Connect to the Amazon Virtual Private Cloud (Amazon VPC) service.
@@ -387,7 +387,7 @@ def create_subnets(vpc, zones='All', count=1, byte_aligned=False, balanced=False
     return subnets
 
 def create_subnet(vpc, zone, cidr_block, subnet_name=None, route_table=None):
-    # Deferred import to resolve interdependency between sky.networking and sky.compute modules.
+    # Deferred import to resolve interdependency between .networking and .compute modules.
     from .compute import connect_ec2
     
     # Connect to the Amazon Virtual Private Cloud (Amazon VPC) service.

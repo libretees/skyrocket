@@ -2,10 +2,10 @@
 from distutils.core import setup
 
 setup(
-    name = 'sky',
+    name = 'skyman',
     packages = ['sky'],
     version = '0.1',
-    description = 'Sky is a tool that allows quick and repeatable deployment of cloud resources.',
+    description = 'Sky is a tool that allows quick and repeatable deployment and management of cloud environments.',
     author = 'Jared Contrascere',
     author_email = 'jcontra@gmail.com',
     url = 'https://github.com/libretees/sky',
@@ -31,7 +31,6 @@ setup(
           'Topic :: Software Development :: Build Tools',
           'Topic :: Software Development :: Libraries',
           'Topic :: Software Development :: Libraries :: Python Modules',
-          'Topic :: System :: Clustering',
           'Topic :: System :: Software Distribution',
           'Topic :: System :: Systems Administration',
     ],

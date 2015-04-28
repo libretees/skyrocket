@@ -13,7 +13,7 @@ from .infrastructure import Infrastructure
 from .state import ready
 
 __author__ = 'Jared Contrascere'
-__copyright__ = 'Copyright 2015, LibreTees, LLC'
+__copyright__ = 'Copyright 2015, LibreTees, LLC. All rights reserved.'
 __license__ = 'GPLv3'
 
 logger = logging.getLogger(__name__)
