@@ -3,6 +3,10 @@ public-key.crt
 private-key.pem
 certificate-chain.pem
 *.tar.gz
+skyfile.py
+user-data.sh
+MANIFEST
+dist/*
 
 # Vim temporary and swap files
 *~
