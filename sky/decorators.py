@@ -1,7 +1,7 @@
 import functools
 import logging
 from .infrastructure import Infrastructure
-from .state import CREATION_MODE, EPHEMERAL, PERMANENT
+from .state import config, mode
 
 logger = logging.getLogger(__name__)
 
@@ -14,21 +14,21 @@ def ephemeral(*args, **kwargs):
         if isinstance(args[0], Infrastructure):
             # Set a wrapped Infractructure object to EPHEMERAL creation mode.
             infrastructure = args[0]
-            infrastructure.category = EPHEMERAL
+            infrastructure.category = mode.EPHEMERAL
             decorator = infrastructure
         else:
-            # Wrap a function in a decorator that sets the infrastructure creation mode to EPHEMERAL.
+            # Wrap a function in a decorator that sets the infrastructure creation mode to mode.EPHEMERAL.
             function, args = args[0], ()
             @functools.wraps(function)
             def decorator(*args, **kwargs):
-                CREATION_MODE = EPHEMERAL
+                config['CREATION_MODE'] = mode.EPHEMERAL
                 return function(*args, **kwargs)
             logging.info('Decorated (%s) as an \'Ephemeral\' Creation Mode function.' % function.__name__)
     else:
         # Define a decorator that will wrap a function in an Ephemeral Infrastructure object.
         def decorator(function):
             infrastructure = Infrastructure(function, *args, **kwargs)
-            infrastructure.category = EPHEMERAL
+            infrastructure.category = mode.EPHEMERAL
             logging.info('Decorated (%s) as an Ephemeral Infrastructure object.' % function.__name__)
             return infrastructure
 
@@ -43,21 +43,21 @@ def permanent(*args, **kwargs):
         if isinstance(args[0], Infrastructure):
             # Set a wrapped Infractructure object to PERMANENT creation mode.
             infrastructure = args[0]
-            infrastructure.category = PERMANENT
+            infrastructure.category = mode.PERMANENT
             decorator = infrastructure
         else:
-            # Wrap the function in a decorator that sets the infrastructure creation mode to PERMANENT.
+            # Wrap the function in a decorator that sets the infrastructure creation mode to mode.PERMANENT.
             function, args = args[0], ()
             @functools.wraps(function)
             def decorator(*args, **kwargs):
-                CREATION_MODE = PERMANENT
+                config['CREATION_MODE'] = mode.PERMANENT
                 return function(*args, **kwargs)
             logging.info('Decorated (%s) as a \'Permanent\' Creation Mode function.' % function.__name__)
     else:
         # Define a decorator that will wrap a function in an Permanent Infrastructure object.
         def decorator(function):
             infrastructure = Infrastructure(function, *args, **kwargs)
-            infrastructure.category = PERMANENT
+            infrastructure.category = mode.PERMANENT
             logging.info('Decorated (%s) as an Permanent Infrastructure object.' % function.__name__)
             return infrastructure
 

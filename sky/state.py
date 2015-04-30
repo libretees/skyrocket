@@ -1,5 +1,6 @@
 import os
 import sys
+from enum import Enum
 import logging
 
 logger = logging.getLogger(__name__)
@@ -21,9 +22,7 @@ class ReadyObject(dict):
 
 ready = ReadyObject()
 
-CREATION_MODE = None
-EPHEMERAL = 'ephemeral'
-PERMANENT = 'permanent'
+mode = Enum('Mode', 'NONE EPHEMERAL PERMANENT CUSTOM')
 
 config = {
     'PROJECT_NAME':          None,
@@ -32,4 +31,5 @@ config = {
     'AWS_ACCOUNT_ID':        None,
     'AWS_ACCESS_KEY_ID':     None,
     'AWS_SECRET_ACCESS_KEY': None,
+    'CREATION_MODE':         None,
 }
