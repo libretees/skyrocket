@@ -71,6 +71,7 @@ def create_network(name=None, internet_connected=False, **kwargs):
     if config['CREATION_MODE'] == mode.PERMANENT:
         existing_vpc = vpc_connection.get_all_vpcs(filters={'tag:Name' : name})
         if len(existing_vpc) > 0:
+            logger.info('Found existing network (%s).' % name)
             return existing_vpc[-1]
 
     if 'cidr_block' in kwargs:
