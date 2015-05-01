@@ -5,7 +5,7 @@ import ipaddress
 import logging
 from operator import itemgetter
 import boto
-from .state import config
+from .state import config, mode
 
 logger = logging.getLogger(__name__)
 
@@ -63,6 +63,16 @@ def create_network(name=None, internet_connected=False, **kwargs):
     # Connect to the Amazon Elastic Compute Cloud (Amazon EC2) service.
     ec2_connection = connect_ec2()
 
+    # Generate Virtual Private Cloud (VPC) name, if needed.
+    if not name:
+        name = '-'.join(['vpc', config['PROJECT_NAME'], config['ENVIRONMENT']])
+
+    # Check for existing network.
+    if config['CREATION_MODE'] == mode.PERMANENT:
+        existing_vpc = vpc_connection.get_all_vpcs(filters={'tag:Name' : name})
+        if len(existing_vpc) > 0:
+            return existing_vpc[-1]
+
     if 'cidr_block' in kwargs:
         cidr_block = kwargs['cidr_block']
     elif 'network_class' in kwargs:
@@ -76,10 +86,6 @@ def create_network(name=None, internet_connected=False, **kwargs):
         
     if not validate_cidr_block(cidr_block):
         sys.exit(1)
-
-    # Generate Virtual Private Cloud (VPC) name, if needed.
-    if not name:
-        name = '-'.join(['vpc', config['PROJECT_NAME'], config['ENVIRONMENT']])
 
     # Create Virtual Private Cloud (VPC).
     network = None
