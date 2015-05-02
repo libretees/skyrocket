@@ -189,6 +189,7 @@ def create_database(vpc, subnets, name=None, engine='postgresql', application_in
                                     ['OptionGroup']\
                                     ['OptionGroupName']
 
+    # FIXME - This doesn't work correctly.
     if not security_groups:
         if application_instances:
             # Create rule(s) allowing traffic from application server security group(s).
