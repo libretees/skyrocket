@@ -157,7 +157,7 @@ def create_option_group(name=None, engine='postgresql'):
 
     return option_group
 
-def create_database(vpc, subnets, name=None, engine='postgresql', application_instances=None, security_groups=None, publicly_accessible=False, multi_az=False, db_parameter_group=None, option_group=None):
+def create_database(vpc, subnets, name=None, engine='postgresql', storage=5, application_instances=None, security_groups=None, publicly_accessible=False, multi_az=False, db_parameter_group=None, option_group=None):
     # Connect to the Amazon Relational Database Service (Amazon RDS).
     rds_connection = connect_rds()
 
@@ -207,7 +207,7 @@ def create_database(vpc, subnets, name=None, engine='postgresql', application_in
                                                                                ,('DNS',   '0.0.0.0/0')])]
 
     db_instance = rds_connection.create_db_instance(name,                                                     # db_instance_identifier
-                                                    5,                                                        # allocated_storage
+                                                    storage,                                                  # allocated_storage
                                                     'db.t2.micro',                                            # db_instance_class
                                                     ENGINE_NAME[engine],                                      # engine
                                                     'username',                                               # master_username
