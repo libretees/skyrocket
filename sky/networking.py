@@ -69,9 +69,9 @@ def create_network(name=None, internet_connected=False, **kwargs):
 
     # Check for existing network.
     if config['CREATION_MODE'] == mode.PERMANENT:
-        existing_vpc = vpc_connection.get_all_vpcs(filters={'tag:Name' : name})
+        existing_vpc = vpc_connection.get_all_vpcs(filters={'tag:Name': name})
         if len(existing_vpc) > 0:
-            logger.info('Found existing network (%s).' % name)
+            logger.info('Found existing Network (%s).' % name)
             return existing_vpc[-1]
 
     if 'cidr_block' in kwargs:
@@ -321,6 +321,16 @@ def create_subnets(vpc, zones='All', count=1, byte_aligned=False, balanced=False
         zones = [zone.strip() for zone in zones.lower().split(',')]
     zones = ec2_connection.get_all_zones(zones)
 
+    # Check for existing Subnets.
+    if config['CREATION_MODE'] == mode.PERMANENT:
+        existing_subnets = vpc_connection.get_all_subnets(filters={'vpc-id': vpc.id,
+                                                                   'availability-zone': [zone.name for zone in zones],
+                                                                   'tag:Type': 'public' if public else 'private',})
+        if len(existing_subnets) > 0:
+            logger.info('Found existing %s Subnets (%s).' % (('Public' if public else 'Private'), \
+                                                              ', '.join([subnet.id for subnet in existing_subnets])))
+            return existing_subnets
+
     # Get the number of Subnets in each zone, so that a Subnet name can be computed.
     for zone in zones:
         offset = len(vpc_connection.get_all_subnets(filters={'vpc-id': vpc.id,
@@ -405,6 +415,16 @@ def create_subnet(vpc, zone, cidr_block, subnet_name=None, route_table=None):
 
     # Break CIDR block into IP and Netmask components.
     network_ip, netmask = get_cidr_block_components(cidr_block)
+
+    # Check for existing Subnet.
+    if config['CREATION_MODE'] == mode.PERMANENT:
+        existing_subnet = vpc_connection.get_all_subnets(filters={'vpc-id': vpc.id,
+                                                                  'availability-zone': zone.name,
+                                                                  'cidrBlock' : cidr_block,
+                                                                  'tag:Name' : subnet_name,})
+        if len(existing_subnet) > 0:
+            logger.info('Found existing Subnet (%s).' % subnet_name)
+            return existing_subnet[-1]
 
     # Create Subnet.
     try:
