@@ -70,7 +70,7 @@ def create_network(name=None, internet_connected=False, **kwargs):
     # Check for existing network.
     if config['CREATION_MODE'] == mode.PERMANENT:
         existing_vpc = vpc_connection.get_all_vpcs(filters={'tag:Name': name})
-        if len(existing_vpc) > 0:
+        if len(existing_vpc):
             logger.info('Found existing Network (%s).' % name)
             return existing_vpc[-1]
 
@@ -422,7 +422,7 @@ def create_subnet(vpc, zone, cidr_block, subnet_name=None, route_table=None):
                                                                   'availability-zone': zone.name,
                                                                   'cidrBlock' : cidr_block,
                                                                   'tag:Name' : subnet_name,})
-        if len(existing_subnet) > 0:
+        if len(existing_subnet):
             logger.info('Found existing Subnet (%s).' % subnet_name)
             return existing_subnet[-1]
 

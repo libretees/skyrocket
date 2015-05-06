@@ -5,7 +5,7 @@ import logging
 from operator import itemgetter
 import boto
 from .networking import connect_vpc, create_route_table
-from .state import config
+from .state import config, mode
 
 logger = logging.getLogger(__name__)
 
@@ -176,6 +176,17 @@ def create_nat_instance(vpc, public_subnet, private_subnet, name=None, security_
     # Connect to the Amazon Virtual Private Cloud (Amazon VPC) service.
     vpc_connection = connect_vpc()
 
+    # Generate name, if one was not specified.
+    if not name:
+        name = '-'.join(['ec2', config['PROJECT_NAME'], config['ENVIRONMENT'], public_subnet.availability_zone, 'nat'])
+
+    # Check for existing NAT Server.
+    if config['CREATION_MODE'] == mode.PERMANENT:
+         nat_instances = get_instances(name=name, role='nat')
+         if len(nat_instances):
+             logger.info('Found existing NAT Server (%s).' % name)
+             return nat_instances
+
     # Create Security Group, if one was not specified.
     if not security_groups:
         sg_name = '-'.join(['gp', config['PROJECT_NAME'], config['ENVIRONMENT'], public_subnet.availability_zone, 'nat'])
@@ -189,10 +200,6 @@ def create_nat_instance(vpc, public_subnet, private_subnet, name=None, security_
     # Get Amazon Linux VPC NAT AMI, if one was not specified.
     if not image_id:
         image_id = get_nat_image()
-
-    # Generate name, if one was not specified.
-    if not name:
-        name = '-'.join(['ec2', config['PROJECT_NAME'], config['ENVIRONMENT'], public_subnet.availability_zone, 'nat'])
 
     # Create NAT Instance.
     nat_instance = create_instance(public_subnet, name=name, role='nat', security_groups=security_groups, image_id=image_id.id, internet_addressable=True)[0]
@@ -382,7 +389,7 @@ def register_instances(load_balancer, servers):
 
     elb_connection.register_instances(load_balancer.name, [server.id for server in servers])
 
-def get_instances(role=None):
+def get_instances(name=None, role=None):
     # Connect to the Amazon Elastic Compute Cloud (Amazon EC2) service.
     ec2_connection = connect_ec2()
 
@@ -390,6 +397,10 @@ def get_instances(role=None):
     filters = {}
     filters['tag:Project'] = config['PROJECT_NAME']
     filters['tag:Environment'] = config['ENVIRONMENT']
+
+    if name:
+        filters['tag:Name'] = name
+
     if role:
         filters['tag:Role'] = role
 
