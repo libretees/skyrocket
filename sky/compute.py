@@ -25,6 +25,17 @@ def create_security_group(vpc, name=None, allowed_inbound_traffic=None, allowed_
     if not name:
         name = '-'.join(['gp', config['PROJECT_NAME'], config['ENVIRONMENT']])
 
+    # Check for existing Security Group.
+    if config['CREATION_MODE'] == mode.PERMANENT:
+        try:
+            existing_security_group = ec2_connection.get_all_security_groups(filters={'group-name': name,})
+            if len(existing_security_group):
+                logger.info('Found existing Security Group (%s).' % name)
+                return existing_security_group[-1]
+        except boto.exception.EC2ResponseError as error:
+            if error.code == 'InvalidGroup.NotFound': # The requested Security Group doesn't exist.
+                pass
+
     if not allowed_inbound_traffic:
         allowed_inbound_traffic = []
 
