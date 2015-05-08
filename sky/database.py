@@ -3,7 +3,7 @@ import time
 import logging
 import boto
 from .compute import create_security_group
-from .state import config
+from .state import config, mode
 
 logger = logging.getLogger(__name__)
 
@@ -167,6 +167,25 @@ def create_database(vpc, subnets, name=None, engine='postgresql', storage=5, app
         name = '-'.join(['db',
                          config['PROJECT_NAME'],
                          config['ENVIRONMENT'],])
+
+    # Check for existing Database.
+    if config['CREATION_MODE'] == mode.PERMANENT:
+        try:
+            response = rds_connection.describe_db_instances(db_instance_identifier=name)
+            if len(response):
+                logger.info('Found existing Database (%s).' % name)
+                db_instance = response['DescribeDBInstancesResponse']\
+                                      ['DescribeDBInstancesResult']\
+                                      ['DBInstances'][-1]
+                endpoint = response['DescribeDBInstancesResponse']\
+                                   ['DescribeDBInstancesResult']\
+                                   ['DBInstances'][-1]\
+                                   ['Endpoint']
+                db_instance['endpoint'] = endpoint
+                return db_instance
+        except boto.rds2.exceptions.DBInstanceNotFound as error:
+            if error.code == 'DBInstanceNotFound': # The requested Database doesn't exist.
+                pass
 
     if not db_parameter_group:
         db_parameter_group = create_db_parameter_group(engine=engine)
