@@ -400,12 +400,13 @@ def register_instances(load_balancer, servers):
 
     elb_connection.register_instances(load_balancer.name, [server.id for server in servers])
 
-def get_instances(name=None, role=None):
+def get_instances(name=None, role=None, state='running'):
     # Connect to the Amazon Elastic Compute Cloud (Amazon EC2) service.
     ec2_connection = connect_ec2()
 
     # Set up filters.
     filters = {}
+    filters['instance-state-name'] = state
     filters['tag:Project'] = config['PROJECT_NAME']
     filters['tag:Environment'] = config['ENVIRONMENT']
 
