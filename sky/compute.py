@@ -118,6 +118,21 @@ def create_load_balancer(vpc, subnets, name=None, security_groups=None, ssl_cert
     elb_connection = boto.connect_elb()
     logger.debug('Connected to the Amazon EC2 Load Balancing (Amazon ELB) service.')
 
+    # Generate Elastic Load Balancer (ELB) name.
+    if not name:
+        name = '-'.join(['elb', config['PROJECT_NAME'], config['ENVIRONMENT']])
+
+    # Check for existing Load Balancer.
+    if config['CREATION_MODE'] == mode.PERMANENT:
+        try:
+            existing_load_balancer = elb_connection.get_all_load_balancers(load_balancer_names=[name])
+            if len(existing_load_balancer):
+                logger.info('Found existing Load Balancer (%s).' % name)
+                return existing_load_balancer
+        except boto.exception.BotoServerError as error:
+            if error.code == 'LoadBalancerNotFound': # The requested Load Balancer doesn't exist.
+                pass
+
     # Set up default security group, if necessary
     if not security_groups:
         security_group_name = '-'.join(['gp', config['PROJECT_NAME'], config['ENVIRONMENT'], 'elb'])
@@ -128,10 +143,6 @@ def create_load_balancer(vpc, subnets, name=None, security_groups=None, ssl_cert
                                                  allowed_outbound_traffic=[('HTTP',  '0.0.0.0/0')
                                                                           ,('HTTPS', '0.0.0.0/0')
                                                                           ,('DNS',   '0.0.0.0/0')])]
-
-    # Generate Elastic Load Balancer (ELB) name.
-    if not name:
-        name = '-'.join(['elb', config['PROJECT_NAME'], config['ENVIRONMENT']])
 
     # Delete existing Elastic Load Balancer (ELB).
     logger.info('Deleting Elastic Load Balancer (%s).' % name)
