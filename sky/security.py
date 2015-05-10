@@ -2,7 +2,7 @@ import time
 import random
 import logging
 import boto
-from .state import config
+from .state import config, mode
 
 logger = logging.getLogger(__name__)
 
@@ -124,9 +124,29 @@ def upload_ssl_certificate(public_key, private_key, certificate_chain=None, name
     # Connect to the Amazon Identity and Access Management (Amazon IAM) service.
     iam_connection = connect_iam()
 
-    # Generate Certificate name.
+    # Generate Server Certificate name.
     if not name:
         name = '-'.join(['crt', config['PROJECT_NAME'], config['ENVIRONMENT']])
+
+    # Check for existing Server Certificate.
+    if config['CREATION_MODE'] == mode.PERMANENT:
+        try:
+            response = iam_connection.get_server_certificate(name)
+            logger.info('Found existing Server Certificate (%s).' % name)
+            server_certificate_id = response['get_server_certificate_response']\
+                                            ['get_server_certificate_result']\
+                                            ['server_certificate']\
+                                            ['server_certificate_metadata']\
+                                            ['server_certificate_id']
+            cert_arn = response['get_server_certificate_response']\
+                               ['get_server_certificate_result']\
+                               ['server_certificate']\
+                               ['server_certificate_metadata']\
+                               ['arn']
+            return cert_arn
+        except boto.exception.BotoServerError as error:
+            if error.code == 'NoSuchEntity': # The requested Server Certificate doesn't exist.
+                pass
 
     # Read SSL Public Key.
     with open(public_key, 'r') as public_key_file:
@@ -152,7 +172,7 @@ def upload_ssl_certificate(public_key, private_key, certificate_chain=None, name
         if error.status == 404: # Not Found
             logger.error('Couldn\'t delete Server Certificate (%s) due to Error %s: %s.' % (name, error.status, error.reason))
 
-    # Upload the SSL Certificate to Amazon IAM.
+    # Upload the Server Certificate to Amazon IAM.
     cert_arn = None
     try:
         logger.info('Uploading server certificate (%s).' % name)
