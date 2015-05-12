@@ -128,9 +128,10 @@ def create_load_balancer(vpc, subnets, name=None, security_groups=None, ssl_cert
             existing_load_balancer = elb_connection.get_all_load_balancers(load_balancer_names=[name])
             if len(existing_load_balancer):
                 logger.info('Found existing Load Balancer (%s).' % name)
+                existing_load_balancer.name = name
                 return existing_load_balancer
         except boto.exception.BotoServerError as error:
-            if error.code == 'LoadBalancerNotFound': # The requested Load Balancer doesn't exist.
+            if error.code == 'LoadBalancerNotFound': # The requested Load BalanScer doesn't exist.
                 pass
 
     # Set up default security group, if necessary
@@ -403,13 +404,21 @@ def install_package(script, package_name):
     script += '\n' + 'apt-get --yes --quiet install %s' % package_name
     return script
 
-def register_instances(load_balancer, servers):
+def register_instances(load_balancer, instances):
     # Connect to the Amazon EC2 Load Balancing (Amazon ELB) service.
     logger.debug('Connecting to the Amazon EC2 Load Balancing (Amazon ELB) service.')
     elb_connection = boto.connect_elb()
     logger.debug('Connected to the Amazon EC2 Load Balancing (Amazon ELB) service.')
 
-    elb_connection.register_instances(load_balancer.name, [server.id for server in servers])
+    elb_connection.register_instances(load_balancer.name, [instance.id for instance in instances])
+
+def deregister_instances(load_balancer, instances):
+    # Connect to the Amazon EC2 Load Balancing (Amazon ELB) service.
+    logger.debug('Connecting to the Amazon EC2 Load Balancing (Amazon ELB) service.')
+    elb_connection = boto.connect_elb()
+    logger.debug('Connected to the Amazon EC2 Load Balancing (Amazon ELB) service.')
+
+    elb_connection.deregister_instances(load_balancer.name, [instance.id for instance in instances])
 
 def get_instances(name=None, role=None, state='running'):
     # Connect to the Amazon Elastic Compute Cloud (Amazon EC2) service.
