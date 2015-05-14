@@ -1,5 +1,4 @@
 import os
-import tarfile
 import random
 import logging
 import boto

@@ -5,7 +5,6 @@
 import os
 import sys
 import types
-from string import Template
 import logging
 import importlib
 from .utils import parse_arguments
@@ -17,15 +16,6 @@ __copyright__ = 'Copyright 2015, LibreTees, LLC. All rights reserved.'
 __license__ = 'GPLv3'
 
 logger = logging.getLogger(__name__)
-
-def get_script(region, s3bucket, s3object, s3object2, filename='user-data.sh'):
-    template = open(filename).read()
-    return Template(template).substitute(
-        region=region,
-        s3bucket=s3bucket,
-        s3object=s3object,
-        s3object2=s3object2
-    )
 
 def load_skyfile(path='./skyfile.py', module_name='skyfile'):
     # Import Skyfile (Only works in Python 3.3+).

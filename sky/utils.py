@@ -1,6 +1,8 @@
 import os
 import sys
+import tarfile
 import logging
+from string import Template
 from re import search, IGNORECASE
 from argparse import ArgumentParser
 from configparser import ConfigParser
@@ -9,6 +11,14 @@ from boto import regioninfo
 from .state import config
 
 logger = logging.getLogger(__name__)
+
+def get_script(region, s3bucket, s3object, filename='user-data.sh'):
+    template = open(filename).read()
+    return Template(template).substitute(
+        region=region,
+        s3bucket=s3bucket,
+        s3object=s3object
+    )
 
 def get_closest_region(service='ec2', repetitions=1):
     regions = [region.name for region in regioninfo.get_regions(service) if 'gov' not in region.name and 'cn' not in region.name]
