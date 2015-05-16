@@ -128,7 +128,7 @@ def create_load_balancer(vpc, subnets, name=None, security_groups=None, ssl_cert
             existing_load_balancer = elb_connection.get_all_load_balancers(load_balancer_names=[name])
             if len(existing_load_balancer):
                 existing_load_balancer = existing_load_balancer[-1]
-                logger.info('Found existing Load Balancer (%s).' % existing_load_balancer.name)
+                logger.info('Found existing Load Balancer (%s) at (%s).' % (existing_load_balancer.name, existing_load_balancer.dns_name))
                 return existing_load_balancer
         except boto.exception.BotoServerError as error:
             if error.code == 'LoadBalancerNotFound': # The requested Load Balancer doesn't exist.
