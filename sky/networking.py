@@ -328,7 +328,7 @@ def create_subnets(vpc, zones='All', count=1, byte_aligned=False, balanced=False
                                                                    'tag:Type': 'public' if public else 'private',})
         if len(existing_subnets) > 0:
             logger.info('Found existing %s Subnets (%s).' % (('Public' if public else 'Private'), \
-                                                              ', '.join([subnet.id for subnet in existing_subnets])))
+                                                              ', '.join([subnet.tags['Name'] for subnet in existing_subnets])))
             return existing_subnets
 
     # Get the number of Subnets in each zone, so that a Subnet name can be computed.
@@ -423,7 +423,7 @@ def create_subnet(vpc, zone, cidr_block, subnet_name=None, route_table=None):
                                                                   'cidrBlock' : cidr_block,
                                                                   'tag:Name' : subnet_name,})
         if len(existing_subnet):
-            logger.info('Found existing Subnet (%s).' % subnet_name)
+            logger.info('Found existing Subnet (%s).' % existing_subnet.tags['Name'])
             return existing_subnet[-1]
 
     # Create Subnet.
