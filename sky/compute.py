@@ -383,6 +383,10 @@ def create_instance(subnet, name=None, role=None, security_groups=None, script=N
             else:
                 raise boto.exception.EC2ResponseError
 
+    # Refresh EC2 instance objects.
+    reservations = ec2_connection.get_all_instances(instance_ids=[instance.id for instance in instances])
+    instances = [instance for reservation in reservations for instance in reservation.instances]
+
     return instances
 
 def get_nat_image(paravirtual=False):
