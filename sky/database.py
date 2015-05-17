@@ -173,7 +173,6 @@ def create_database(vpc, subnets, name=None, engine='postgresql', storage=5, app
         try:
             response = rds_connection.describe_db_instances(db_instance_identifier=name)
             if len(response):
-                logger.info('Found existing Database (%s).' % name)
                 db_instance = response['DescribeDBInstancesResponse']\
                                       ['DescribeDBInstancesResult']\
                                       ['DBInstances'][-1]
@@ -182,6 +181,7 @@ def create_database(vpc, subnets, name=None, engine='postgresql', storage=5, app
                                    ['DBInstances'][-1]\
                                    ['Endpoint']
                 db_instance['endpoint'] = endpoint
+                logger.info('Found existing Database (%s) at (%s:%s).' % (name, endpoint['Address'], endpoint['Port']))
                 return db_instance
         except boto.rds2.exceptions.DBInstanceNotFound as error:
             if error.code == 'DBInstanceNotFound': # The requested Database doesn't exist.
