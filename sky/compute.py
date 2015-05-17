@@ -411,7 +411,13 @@ def register_instances(load_balancer, instances):
     elb_connection = boto.connect_elb()
     logger.debug('Connected to the Amazon EC2 Load Balancing (Amazon ELB) service.')
 
+    logger.info('Registering (%s) with Load Balancer (%s).' % (', '.join([instance.tags['Name'] for instance in instances]) if len(instances) > 1 \
+                                                               else instances[-1].tags['Name'], \
+                                                               load_balancer.name))
     elb_connection.register_instances(load_balancer.name, [instance.id for instance in instances])
+    logger.info('Registered (%s) with Load Balancer (%s).' % (', '.join([instance.tags['Name'] for instance in instances]) if len(instances) > 1 \
+                                                              else instances[-1].tags['Name'], \
+                                                              load_balancer.name))
 
 def deregister_instances(load_balancer, instances):
     # Connect to the Amazon EC2 Load Balancing (Amazon ELB) service.
@@ -462,3 +468,47 @@ def terminate_instances(instances):
         ec2_connection.terminate_instances(instance_ids=[instance.id for instance in instances])
         logger.info('Terminated (%s).' % (', '.join([instance.tags['Name'] for instance in instances]) if len(instances) > 1 \
                                                     else instances[-1].tags['Name']))
+
+def rotate_instances(load_balancer, instances, terminate_outgoing_instances=True):
+    # Connect to the Amazon Elastic Compute Cloud (Amazon EC2) service.
+    ec2_connection = connect_ec2()
+
+    # Retrieve outgoing EC2 instances.
+    old_reservations = ec2_connection.get_all_instances(instance_ids=[old_instance.id for old_instance in load_balancer.instances]) if load_balancer.instances else None
+    old_instances = [instance for reservation in old_reservations for instance in reservation.instances] if load_balancer.instances else None
+
+    # Register incoming EC2 instances with the Load Balancer.
+    register_instances(load_balancer, instances)
+
+    # Determine incoming EC2 instance states with respect to the Load Balancer.
+    instance_states = load_balancer.get_instance_health(instances=[instance.id for instance in instances])
+
+    # Rotate EC2 instances.
+    while old_instances and 'OutOfService' in [instance_state.state for instance_state in instance_states]:
+        # Refresh incoming EC2 instance states with respect to the Load Balancer.
+        instance_states = load_balancer.get_instance_health(instances=[instance.id for instance in instances])
+
+        # Check whether or not an EC2 instance has come into service.
+        for instance_state in instance_states:
+            # Terminate outgoing EC2 instance when an incoming EC2 instance has come into service.
+            if instance_state.state == 'InService' and instance_state.instance_id not in [old_instance.id for old_instance in old_instances]:
+                # Get incoming instance.
+                instance = next(instance for instance in instances if instance.id == instance_state.instance_id)
+                logger.info('EC2 Instance (%s) has come into service.' % instance.tags['Name'])
+
+                # Get outgoing EC2 instance.
+                old_instance = next(old_instance for old_instance in old_instances if old_instance.subnet_id == instance.subnet_id)
+
+                # Deregister outgoing EC2 instance from Load Balancer.
+                deregister_instances(load_balancer, [old_instance])
+
+                if terminate_outgoing_instances:
+                    # Terminate outgoing EC2 instance.
+                    terminate_instances([old_instance])
+
+                # Remove incoming EC2 instance from list.
+                instances.remove(instance)
+
+        # Throttle EC2 instance rotation.
+        if 'OutOfService' in [instance_state.state for instance_state in instance_states]:
+            time.sleep(5)
