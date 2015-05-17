@@ -282,7 +282,7 @@ def create_nat_instance(vpc, public_subnet, private_subnet, name=None, security_
 
     return nat_instance
 
-def create_instances(vpc, subnets, role=None, security_groups=None, script=None, instance_profile=None, os='ubuntu', image_id=None, internet_addressable=False):
+def create_instances(vpc, subnets, role=None, security_groups=None, script=None, instance_profile=None, os='ubuntu', image_id=None, key_name=None, internet_addressable=False):
     # Create a security group, if a security group was not specified.
     if not security_groups:
         security_groups = [create_security_group(vpc, allowed_inbound_traffic=[('HTTP',   '0.0.0.0/0')
@@ -294,11 +294,11 @@ def create_instances(vpc, subnets, role=None, security_groups=None, script=None,
     # Create EC2 instances.
     instances = list()
     for subnet in subnets:
-        instance = create_instance(subnet, role=role, security_groups=security_groups, script=script, instance_profile=instance_profile, os=os, image_id=image_id, internet_addressable=internet_addressable)
+        instance = create_instance(subnet, role=role, security_groups=security_groups, script=script, instance_profile=instance_profile, os=os, image_id=image_id, key_name=key_name, internet_addressable=internet_addressable)
         instances = instances + instance
     return instances
 
-def create_instance(subnet, name=None, role=None, security_groups=None, script=None, instance_profile=None, os='ubuntu', image_id=None, internet_addressable=False):
+def create_instance(subnet, name=None, role=None, security_groups=None, script=None, instance_profile=None, os='ubuntu', image_id=None, key_name=None, internet_addressable=False):
     # Set up dictionary of OSes and their associated quick-start Amazon Machine Images (AMIs).
     ami = {
         'amazon-linux': 'ami-146e2a7c',
@@ -335,6 +335,7 @@ def create_instance(subnet, name=None, role=None, security_groups=None, script=N
     # Create EC2 Reservation.
     logger.info('Creating EC2 Instance (%s) in %s.' % (name, subnet.availability_zone))
     reservation = ec2_connection.run_instances(image_id,                 # image_id
+                                               key_name=key_name,
                                                instance_type='t2.micro',
                                                instance_profile_name=instance_profile.name if instance_profile else None,
                                                network_interfaces=interfaces,
@@ -418,7 +419,13 @@ def deregister_instances(load_balancer, instances):
     elb_connection = boto.connect_elb()
     logger.debug('Connected to the Amazon EC2 Load Balancing (Amazon ELB) service.')
 
+    logger.info('Deregistering (%s) from Load Balancer (%s).' % (', '.join([instance.tags['Name'] for instance in instances]) if len(instances) > 1 \
+                                                                 else instances[-1].tags['Name'], \
+                                                                 load_balancer.name))
     elb_connection.deregister_instances(load_balancer.name, [instance.id for instance in instances])
+    logger.info('Deregistered (%s) from Load Balancer (%s).' % (', '.join([instance.tags['Name'] for instance in instances]) if len(instances) > 1 \
+                                                                else instances[-1].tags['Name'], \
+                                                                load_balancer.name))
 
 def get_instances(name=None, role=None, state='running'):
     # Connect to the Amazon Elastic Compute Cloud (Amazon EC2) service.
@@ -450,4 +457,8 @@ def terminate_instances(instances):
     
     # Terminate EC2 instances.
     if instances:
+        logger.info('Terminating (%s).' % (', '.join([instance.tags['Name'] for instance in instances]) if len(instances) > 1 \
+                                                     else instances[-1].tags['Name']))
         ec2_connection.terminate_instances(instance_ids=[instance.id for instance in instances])
+        logger.info('Terminated (%s).' % (', '.join([instance.tags['Name'] for instance in instances]) if len(instances) > 1 \
+                                                    else instances[-1].tags['Name']))
