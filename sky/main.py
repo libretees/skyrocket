@@ -100,7 +100,6 @@ def build_dependency_graph(nodes, level=1):
     return graph
 
 def build_target(dependency_graph, target='all'):
-
     # Rebuild the dependency graph, if a specific target was specified.
     if target != 'all':
         target_found = False
@@ -164,26 +163,6 @@ def main():
 
     for target in targets:
         build_target(dependency_graph, target=target)
-
-    # archive_name = '.'.join([s3.PROJECT_NAME, 'tar', 'gz'])
-    # logger.info('Creating deployment archive (%s).' % archive_name)
-    # s3.make_tarfile(archive_name, s3.PROJECT_DIRECTORY)
-    # logger.info('Created deployment archive (%s).' % archive_name)
-
-    # bootstrap_archive_name = '.'.join(['configure', s3.PROJECT_NAME, 'tar', 'gz'])
-    # s3.make_tarfile(bootstrap_archive_name, 'deploy')
-
-    # bucket = s3.create_bucket()
-    # s3.add_object(bucket, archive_name)
-    # s3.add_object(bucket, bootstrap_archive_name)
-    # policy = s3.get_bucket_policy(bucket)
-
-    # script = get_script('us-east-1', bucket.name, archive_name, bootstrap_archive_name)
-    # script = ec2.install_package(script, 'python3-pip')
-    # script = ec2.run(script, 'pip3 install virtualenv')
-    # script = ec2.run(script, 'pip3 install virtualenvwrapper')
-
-    # instance_profile_name = iam.create_role(policy)
 
 if __name__ == '__main__':
     main()
