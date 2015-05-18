@@ -57,6 +57,7 @@ def parse_arguments():
     valid_arguments = True
     parser = ArgumentParser(description='Provision Django application environments.')
     parser.add_argument('command', metavar='<command>', action='store', help='Valid commands are [deploy]')
+    parser.add_argument('targets', metavar='<targets>', action='store', nargs='*', default=['all'], help='Skyfile Targets')
     parser.add_argument('-p', '--project', dest='directory', action='store', default=os.getcwd(),
                         help='set Django project directory')
     parser.add_argument('-env', '--environment', dest='environment', action='store', default='STAGING',
@@ -170,6 +171,7 @@ def parse_arguments():
         logger.error('Exiting...')
         sys.exit(1)
 
+    config['TARGETS'] = args.targets
     config['PROJECT_NAME'] = os.path.abspath(os.path.expanduser(args.directory)).split(os.sep)[-1].lower()
     config['PROJECT_DIRECTORY'] = os.path.abspath(os.path.expanduser(args.directory)).lower()
     config['ENVIRONMENT'] = args.environment.lower()
