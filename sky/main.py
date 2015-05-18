@@ -140,7 +140,7 @@ def build_target(dependency_graph, target='all'):
                         # Add indirect dependencies to the target's dependency chain.
                         elif dependency.__name__ in target_dependencies and dependency.dependencies:
                             logger.debug('Unioning additional dependency/ies (%s).' % dependency.dependencies)
-                            target_dependencies = target_dependencies | dependency.dependencies
+                            target_dependencies |= dependency.dependencies
                             logger.debug('Unioned additional dependency/ies (%s).' % dependency.dependencies)
 
                 # Reset the dependency graph.

@@ -8,7 +8,7 @@ from .state import config, mode
 logger = logging.getLogger(__name__)
 
 ENGINE = {
-    'postgresql': 'postgres9.3',
+    'postgresql': 'postgres9.4',
     'mysql':      'MySQL5.6',
     'oracle':     'oracle-se1-11.2',
 }
@@ -20,7 +20,7 @@ ENGINE_NAME = {
 }
 
 MAJOR_ENGINE_VERSION = {
-    'postgresql': '9.3',
+    'postgresql': '9.4',
     'mysql':      '5.1.42',
     'oracle':     '11.2.0.2.v2',
 }
@@ -157,7 +157,7 @@ def create_option_group(name=None, engine='postgresql'):
 
     return option_group
 
-def create_database(vpc, subnets, name=None, engine='postgresql', storage=5, application_instances=None, security_groups=None, publicly_accessible=False, multi_az=False, db_parameter_group=None, option_group=None):
+def create_database(vpc, subnets, name=None, engine='postgresql', storage=5, application_instances=None, application_security_groups=None, security_groups=None, publicly_accessible=False, multi_az=False, db_parameter_group=None, option_group=None):
     # Connect to the Amazon Relational Database Service (Amazon RDS).
     rds_connection = connect_rds()
 
@@ -208,22 +208,29 @@ def create_database(vpc, subnets, name=None, engine='postgresql', storage=5, app
                                     ['OptionGroup']\
                                     ['OptionGroupName']
 
-    # FIXME - This doesn't work correctly.
+
     if not security_groups:
+        application_security_group_ids = set()
+
         if application_instances:
             # Create rule(s) allowing traffic from application server security group(s).
-            application_security_group_ids = set([group.id for instance in application_instances for group in instance.groups])
-            inbound_rules = list()
-            for application_security_group_id in application_security_group_ids:
-                inbound_rule = ('TCP:' + str(INBOUND_PORT[engine]), application_security_group_id)
-                inbound_rules.append(inbound_rule)
+            application_security_group_ids |= set([group.id for instance in application_instances for group in instance.groups])
+
+        if application_security_groups:
+            # Create rule(s) allowing traffic from application security group(s).
+            application_security_group_ids |= set([group.id for group in application_security_groups])
+
+        inbound_rules = list()
+        outbound_rules = list()
+        for application_security_group_id in application_security_group_ids:
+            inbound_rule = ('TCP:' + str(INBOUND_PORT[engine]), application_security_group_id)
+            inbound_rules.append(inbound_rule)
 
         sg_name = '-'.join(['gp', config['PROJECT_NAME'], config['ENVIRONMENT'], 'db'])
-        security_groups = [create_security_group(vpc, name=sg_name
-                                                    , allowed_inbound_traffic=inbound_rules if application_instances else None
-                                                    , allowed_outbound_traffic=[('HTTP',  '0.0.0.0/0')
-                                                                               ,('HTTPS', '0.0.0.0/0')
-                                                                               ,('DNS',   '0.0.0.0/0')])]
+        security_groups = [create_security_group(vpc,
+                                                 name=sg_name,
+                                                 allowed_inbound_traffic=inbound_rules if application_security_groups else None,
+                                                 allowed_outbound_traffic=None)] # Outbound rules do not apply to RDS instances (per http://docs.aws.amazon.com/AmazonRDS/latest/UserGuide/Overview.RDSSecurityGroups.html).
 
     db_instance = rds_connection.create_db_instance(name,                                                     # db_instance_identifier
                                                     storage,                                                  # allocated_storage
@@ -242,7 +249,7 @@ def create_database(vpc, subnets, name=None, engine='postgresql', storage=5, app
                                                     preferred_backup_window=None,
                                                     port=None,
                                                     multi_az=multi_az,
-                                                    engine_version=None,
+                                                    engine_version=MAJOR_ENGINE_VERSION[engine],
                                                     auto_minor_version_upgrade=None,
                                                     license_model=None,
                                                     iops=None,
