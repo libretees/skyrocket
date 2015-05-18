@@ -50,7 +50,7 @@ class Infrastructure(object):
         return self._result
 
     def __getattr__(self, attr):
-            return self._locals[attr]
+        return self._locals[attr] if self._locals else super(Infrastructure, self).__getattr__()
 
     def _set_creation_mode(self):
         global config
