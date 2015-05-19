@@ -484,27 +484,33 @@ def rotate_instances(load_balancer, instances, terminate_outgoing_instances=True
     # Register incoming EC2 instances with the Load Balancer.
     register_instances(load_balancer, instances)
 
-    # Determine incoming EC2 instance states with respect to the Load Balancer.
-    instance_states = load_balancer.get_instance_health(instances=[instance.id for instance in instances])
-
     # Rotate EC2 instances.
-    new_instance_names = ', '.join([instance.tags['Name'] for instance in instances]) if len(instances) > 1 \
-                         else instances[-1].tags['Name']
     if old_instances:
+        new_instance_names = ', '.join([instance.tags['Name'] for instance in instances]) if len(instances) > 1 \
+                             else instances[-1].tags['Name']
+        old_instance_names = ', '.join([instance.tags['Name'] for instance in old_instances]) if len(old_instances) > 1 \
+                             else old_instances[-1].tags['Name']
         logger.info('Rotating incoming EC2 Instances (%s) and outgoing EC2 instances (%s) under Load Balancer (%s).' % (new_instance_names,
-                                                                                                                        ', '.join([instance.tags['Name'] for instance in old_instances]) if len(old_instances) > 1 \
-                                                                                                                        else old_instances[-1].tags['Name'],
+                                                                                                                        old_instance_names,
                                                                                                                         load_balancer.name))
-    while old_instances and 'OutOfService' in [instance_state.state for instance_state in instance_states]:
-        # Refresh incoming EC2 instance states with respect to the Load Balancer.
+        # Determine incoming EC2 instance states with respect to the Load Balancer.
         instance_states = load_balancer.get_instance_health(instances=[instance.id for instance in instances])
 
-        # Check whether or not an EC2 instance has come into service.
-        for instance_state in instance_states:
+        # Rotate EC2 instances with a new EC2. instance has come into service.
+        while 'OutOfService' in [instance_state.state for instance_state in instance_states]:
+            # Refresh incoming EC2 instance states with respect to the Load Balancer.
+            instance_states = load_balancer.get_instance_health(instances=[instance.id for instance in instances])
+
+            print('instance_states', instance_states)
+
+            # Throttle EC2 instance rotation.
+            if 'OutOfService' in [instance_state.state for instance_state in instance_states]:
+                time.sleep(5)
+
             # Terminate outgoing EC2 instance when an incoming EC2 instance has come into service.
-            if instance_state.state == 'InService' and instance_state.instance_id not in [old_instance.id for old_instance in old_instances]:
+            for instance_id in [instance_state.instance_id for instance_state in instance_states if instance_state.state == 'InService']:
                 # Get incoming instance.
-                instance = next(instance for instance in instances if instance.id == instance_state.instance_id)
+                instance = next(instance for instance in instances if instance.id == instance_id)
                 logger.info('EC2 Instance (%s) has come into service.' % instance.tags['Name'])
 
                 # Get outgoing EC2 instance.
@@ -520,11 +526,6 @@ def rotate_instances(load_balancer, instances, terminate_outgoing_instances=True
                 # Remove incoming EC2 instance from list.
                 instances.remove(instance)
 
-        # Throttle EC2 instance rotation.
-        if 'OutOfService' in [instance_state.state for instance_state in instance_states]:
-            time.sleep(5)
-    if old_instances:
         logger.info('Rotated incoming EC2 Instances (%s) and outgoing EC2 instances (%s) under Load Balancer (%s).' % (new_instance_names,
-                                                                                                                       ', '.join([instance.tags['Name'] for instance in old_instances]) if len(old_instances) > 1 \
-                                                                                                                       else old_instances[-1].tags['Name'],
+                                                                                                                       old_instance_names,
                                                                                                                        load_balancer.name))
