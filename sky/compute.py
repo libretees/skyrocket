@@ -488,6 +488,13 @@ def rotate_instances(load_balancer, instances, terminate_outgoing_instances=True
     instance_states = load_balancer.get_instance_health(instances=[instance.id for instance in instances])
 
     # Rotate EC2 instances.
+    new_instance_names = ', '.join([instance.tags['Name'] for instance in instances]) if len(instances) > 1 \
+                         else instances[-1].tags['Name']
+    if old_instances:
+        logger.info('Rotating incoming EC2 Instances (%s) and outgoing EC2 instances (%s) under Load Balancer (%s).' % (new_instance_names,
+                                                                                                                        ', '.join([instance.tags['Name'] for instance in old_instances]) if len(old_instances) > 1 \
+                                                                                                                        else old_instances[-1].tags['Name'],
+                                                                                                                        load_balancer.name))
     while old_instances and 'OutOfService' in [instance_state.state for instance_state in instance_states]:
         # Refresh incoming EC2 instance states with respect to the Load Balancer.
         instance_states = load_balancer.get_instance_health(instances=[instance.id for instance in instances])
@@ -516,3 +523,8 @@ def rotate_instances(load_balancer, instances, terminate_outgoing_instances=True
         # Throttle EC2 instance rotation.
         if 'OutOfService' in [instance_state.state for instance_state in instance_states]:
             time.sleep(5)
+    if old_instances:
+        logger.info('Rotated incoming EC2 Instances (%s) and outgoing EC2 instances (%s) under Load Balancer (%s).' % (new_instance_names,
+                                                                                                                       ', '.join([instance.tags['Name'] for instance in old_instances]) if len(old_instances) > 1 \
+                                                                                                                       else old_instances[-1].tags['Name'],
+                                                                                                                       load_balancer.name))
