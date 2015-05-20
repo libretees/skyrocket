@@ -17,7 +17,10 @@ def connect_ec2():
 
     return ec2
 
-def create_security_group(vpc, name=None, allowed_inbound_traffic=None, allowed_outbound_traffic=None):
+def create_security_group(vpc, name=None, database_backend=None, allowed_inbound_traffic=[], allowed_outbound_traffic=[]):
+    # Defer import to resolve interdependency between .database and .compute modules.
+    from .database import INBOUND_PORT
+
     # Connect to the Amazon Elastic Compute Cloud (Amazon EC2) service.
     ec2_connection = connect_ec2()
 
@@ -36,11 +39,8 @@ def create_security_group(vpc, name=None, allowed_inbound_traffic=None, allowed_
             if error.code == 'InvalidGroup.NotFound': # The requested Security Group doesn't exist.
                 pass
 
-    if not allowed_inbound_traffic:
-        allowed_inbound_traffic = []
-
-    if not allowed_outbound_traffic:
-        allowed_outbound_traffic = []
+    if database_backend:
+        allowed_outbound_traffic.append(('TCP:%d' % INBOUND_PORT[database_backend], '0.0.0.0/0'))
 
     # Create Security Group.
     logger.info('Creating Security Group (%s).' % name)
