@@ -501,12 +501,6 @@ def rotate_instances(load_balancer, instances, terminate_outgoing_instances=True
             # Refresh incoming EC2 instance states with respect to the Load Balancer.
             instance_states = load_balancer.get_instance_health(instances=[instance.id for instance in instances])
 
-            print('instance_states', instance_states)
-
-            # Throttle EC2 instance rotation.
-            if 'OutOfService' in [instance_state.state for instance_state in instance_states]:
-                time.sleep(5)
-
             # Terminate outgoing EC2 instance when an incoming EC2 instance has come into service.
             for instance_id in [instance_state.instance_id for instance_state in instance_states if instance_state.state == 'InService']:
                 # Get incoming instance.
@@ -525,6 +519,9 @@ def rotate_instances(load_balancer, instances, terminate_outgoing_instances=True
 
                 # Remove incoming EC2 instance from list.
                 instances.remove(instance)
+
+            # Throttle EC2 instance rotation.
+            time.sleep(5)
 
         logger.info('Rotated incoming EC2 Instances (%s) and outgoing EC2 instances (%s) under Load Balancer (%s).' % (new_instance_names,
                                                                                                                        old_instance_names,
