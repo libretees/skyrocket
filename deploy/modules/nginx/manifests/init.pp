@@ -10,6 +10,20 @@ class nginx {
         notify  => Service['nginx'],
     }
 
+    file { '/etc/nginx/public.crt':
+        ensure  => file,
+        content => template("nginx/public.crt"),
+        require => Package['nginx'],
+        notify  => Service['nginx'],
+    }
+
+    file { '/etc/nginx/private.key':
+        ensure  => file,
+        content => template("nginx/private.key"),
+        require => Package['nginx'],
+        notify  => Service['nginx'],
+    }
+
     file { '/etc/nginx/sites-available/default':
         ensure  => file,
         content => template("nginx/nginx-app-proxy"),
