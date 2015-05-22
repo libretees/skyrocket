@@ -1,12 +1,14 @@
 # Project-specific files
-public-key.crt
-private-key.pem
-certificate-chain.pem
 *.tar.gz
 skyfile.py
 user-data.sh
 MANIFEST
 dist/*
+
+# SSL-specific files
+*.crt
+*.pem
+*.key
 
 # Vim temporary and swap files
 *~
