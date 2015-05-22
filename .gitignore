@@ -6,7 +6,6 @@ certificate-chain.pem
 skyfile.py
 user-data.sh
 MANIFEST
-deploy/*
 dist/*
 
 # Vim temporary and swap files
