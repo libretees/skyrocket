@@ -230,7 +230,7 @@ def create_database(vpc, subnets, name=None, engine='postgresql', storage=5, app
         security_groups = [create_security_group(vpc,
                                                  name=sg_name,
                                                  allowed_inbound_traffic=inbound_rules if application_security_groups else None,
-                                                 allowed_outbound_traffic=None)] # Outbound rules do not apply to RDS instances (per http://docs.aws.amazon.com/AmazonRDS/latest/UserGuide/Overview.RDSSecurityGroups.html).
+                                                 allowed_outbound_traffic=[])] # Outbound rules do not apply to RDS instances (per http://docs.aws.amazon.com/AmazonRDS/latest/UserGuide/Overview.RDSSecurityGroups.html).
 
     db_instance = rds_connection.create_db_instance(name,                                                     # db_instance_identifier
                                                     storage,                                                  # allocated_storage
