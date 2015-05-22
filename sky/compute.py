@@ -160,9 +160,8 @@ def create_load_balancer(vpc, subnets, name=None, security_groups=None, ssl_cert
     if not security_groups:
         security_groups = create_security_group(vpc)
 
+    # Set up basic HTTP listener.
     listeners = [(80, 80, 'HTTP')]
-    if ssl_certificate:
-        listeners.append((443, 443, 'HTTPS', ssl_certificate))
 
     # Create Elastic Load Balancer (ELB).
     logger.info('Creating Elastic Load Balancer (%s).' % name)
@@ -174,6 +173,11 @@ def create_load_balancer(vpc, subnets, name=None, security_groups=None, ssl_cert
                                                         scheme='internet-facing', # Valid only for load balancers in EC2-VPC.
                                                         complex_listeners=None)
     logger.info('Created Elastic Load Balancer (%s).' % name)
+
+    # Add HTTPS listener if a SSL certificate was specified.
+    if ssl_certificate:
+        listeners = [(443, 443, 'HTTPS', 'HTTPS', ssl_certificate)]
+        elb_connection.create_load_balancer_listeners(name, listeners=None, complex_listeners=listeners)
 
     return load_balancer
 
