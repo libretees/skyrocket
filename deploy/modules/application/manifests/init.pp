@@ -12,6 +12,7 @@ class application {
 
     exec { 'mkvirtualenv www':
         command => "bash --login -c 'source /home/ubuntu/.profile && mkvirtualenv --python=/usr/bin/python3 www'",
+        creates => '/srv/.virtualenvs/www',
         path => ['/bin', '/usr/bin', '/usr/local/bin'],
         user => ubuntu,
         cwd => '/srv/www',
@@ -36,6 +37,7 @@ class application {
 
     exec { 'django-admin startproject app':
         command => "bash --login -c 'source /home/ubuntu/.profile && workon www && django-admin startproject app'",
+        creates => '/srv/www/app',
         path => ['/bin', '/usr/bin', '/usr/local/bin'],
         user => ubuntu,
         cwd => '/srv/www',
@@ -52,6 +54,7 @@ class application {
 
     exec { 'gunicorn wsgi:application':
         command => "bash --login -c 'source /home/ubuntu/.profile && workon www && gunicorn --daemon app.wsgi:application'",
+        unless => "/usr/bin/test $(netstat -lntu | awk '{print $4}' | grep 127.0.0.1:8000 | wc -l) -eq 1",
         path => ['/bin', '/usr/bin', '/usr/local/bin'],
         user => www-data,
         cwd => '/srv/www/app',
