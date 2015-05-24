@@ -10,6 +10,9 @@ from .state import config, mode
 logger = logging.getLogger(__name__)
 
 def connect_ec2():
+    """
+    Connect to the Amazon Elastic Compute Cloud (Amazon EC2) service.
+    """
     logger.debug('Connecting to the Amazon Elastic Compute Cloud (Amazon EC2) service.')
     ec2 = boto.connect_ec2(aws_access_key_id=config['AWS_ACCESS_KEY_ID'],
                            aws_secret_access_key=config['AWS_SECRET_ACCESS_KEY'])
