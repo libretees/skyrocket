@@ -20,7 +20,7 @@ import shlex
 # If extensions (or modules to document with autodoc) are in another directory,
 # add these directories to sys.path here. If the directory is relative to the
 # documentation root, use os.path.abspath to make it absolute, like shown here.
-sys.path.insert(0, os.path.abspath('../../sky'))
+sys.path.insert(0, os.path.abspath('../..'))
 
 # -- General configuration ------------------------------------------------
 
@@ -50,7 +50,7 @@ master_doc = 'index'
 
 # General information about the project.
 project = 'Sky'
-copyright = '2015, Jared Contrascere'
+copyright = '2015, LibreTees, LLC. All rights reserved'
 author = 'Jared Contrascere'
 
 # The version info for the project you're documenting, acts as replacement for
@@ -226,7 +226,7 @@ latex_elements = {
 #  author, documentclass [howto, manual, or own class]).
 latex_documents = [
   (master_doc, 'Sky.tex', 'Sky Documentation',
-   'Jared Contrascere', 'manual'),
+   'LibreTess, LLC', 'manual'),
 ]
 
 # The name of an image file (relative to this directory) to place at the top of

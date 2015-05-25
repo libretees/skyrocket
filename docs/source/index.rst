@@ -11,6 +11,7 @@ Contents:
 .. toctree::
    :maxdepth: 2
 
+.. automodule:: sky.compute
 
 
 Indices and tables
