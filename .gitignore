@@ -10,6 +10,9 @@ dist/*
 *.pem
 *.key
 
+# Sphinx build directory
+docs/build/*
+
 # Vim temporary and swap files
 *~
 *.swp
