@@ -26,7 +26,7 @@ Virtual Private Cloud (a private network).
                                         public=True)
         
     @ephemeral
-    @infrastructure(requires=['network''])
+    @infrastructure(requires=['network'])
     def application():
         instances = create_instances(ready.network.virtual_network,
                                      ready.network.public_subnets,
