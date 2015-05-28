@@ -40,7 +40,7 @@ an optional ``requires`` argument, where requisite infrastructure can be listed.
 A special ``ready`` Object allows functions to reference infrastructure created
 earlier in deployment.
 
-Once an infrastructure is defined, it may be deployed to an AWS, like so::
+Once an infrastructure is defined, it may be deployed to AWS, like so::
 
     $ sky deploy
 
