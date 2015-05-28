@@ -1,5 +1,5 @@
 Sky is a Python (3.4) library and command-line tool for rapid deployment of
-cloud infrastructures. It supports DevOps by defining Infrastructure as Code
+cloud infrastructures. It supports DevOps by defining infrastructure as code
 and orchestrating resource creation and termination.
 
 The command line tool is an application-level interface to
