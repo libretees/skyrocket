@@ -1,14 +1,14 @@
-Sky is a Python (3.4) library and command-line tool for rapid deployment of 
-cloud infrastructures. It supports DevOps by defining Infrastructure as Code 
+Sky is a Python (3.4) library and command-line tool for rapid deployment of
+cloud infrastructures. It supports DevOps by defining Infrastructure as Code
 and orchestrating resource creation and termination.
 
 The command line tool is an application-level interface to
 `Amazon Web Services <http://aws.amazon.com/>`_ that leverages the ``boto``
 library.
 
-Typical use involves the creation of a Python module with one or more 
-functions, then executing them via the ``sky`` command-line tool. Below is an 
-example "skyfile" that places an Amazon EC2 instance (a server) within a 
+Typical use involves the creation of a Python module with one or more
+functions, then executing them via the ``sky`` command-line tool. Below is an
+example "skyfile" that places an Amazon EC2 instance (a server) within a
 Virtual Private Cloud (a private network).
 
 .. code-block:: python
@@ -32,6 +32,13 @@ Virtual Private Cloud (a private network).
                                      ready.network.public_subnets,
                                      internet_addressable=True,
                                      role='application')
+
+Note that the ``infrastructure`` decorator denotes a function as a cloud
+resource, to be created by the ``sky`` command-line tool. This decorator takes
+an optional ``requires`` argument, where requisite infrastructure can be listed.
+
+A special ``ready`` Object allows functions to reference infrastructure created
+earlier in deployment.
 
 Once an infrastructure is defined, it may be deployed to an AWS, like so::
 
