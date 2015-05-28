@@ -18,8 +18,12 @@ Virtual Private Cloud (a private network).
     @permanent
     @infrastructure
     def network():
-        virtual_network = create_network(network_class='b', internet_connected=True)
-        public_subnets = create_subnets(virtual_network, zones='us-east-1b', byte_aligned=True, public=True)
+        virtual_network = create_network(network_class='b',
+                                         internet_connected=True)
+        public_subnets = create_subnets(virtual_network,
+                                        zones='us-east-1b',
+                                        byte_aligned=True,
+                                        public=True)
         
     @ephemeral
     @infrastructure(requires=['network''])
