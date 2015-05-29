@@ -11,8 +11,16 @@ Contents:
 .. toctree::
    :maxdepth: 2
 
-.. automodule:: sky.compute
+:mod:`sky` -- Main package
+**************************
 
+.. automodule:: sky
+
+:mod:`sky.compute` -- Amazon EC2 Services
+-----------------------------------------
+
+.. automodule:: sky.compute
+   :members:
 
 Indices and tables
 ==================
@@ -20,4 +28,3 @@ Indices and tables
 * :ref:`genindex`
 * :ref:`modindex`
 * :ref:`search`
-
