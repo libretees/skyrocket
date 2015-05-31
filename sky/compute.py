@@ -21,6 +21,9 @@ def connect_ec2():
     return ec2
 
 def create_security_group(vpc, name=None, database_backend=None, allowed_inbound_traffic=[], allowed_outbound_traffic=[]):
+    """
+    Create Amazon EC2-VPC Security Group.
+    """
     # Defer import to resolve interdependency between .database and .compute modules.
     from .database import INBOUND_PORT
 
