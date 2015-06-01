@@ -2,7 +2,7 @@
 # -*- coding: utf-8 -*-
 #
 # Sky documentation build configuration file, created by
-# sphinx-quickstart on Sun May 24 22:40:35 2015.
+# sphinx-quickstart on Sun May 31 22:37:26 2015.
 #
 # This file is execfile()d with the current directory set to its
 # containing dir.
@@ -35,6 +35,7 @@ sys.path.insert(0, os.path.abspath('../..'))
 # ones.
 extensions = [
     'sphinx.ext.autodoc',
+    'sphinx.ext.intersphinx',
 ]
 
 # Add any paths that contain templates here, relative to this directory.
@@ -229,7 +230,7 @@ latex_elements = {
 #  author, documentclass [howto, manual, or own class]).
 latex_documents = [
   (master_doc, 'Sky.tex', 'Sky Documentation',
-   'LibreTess, LLC', 'manual'),
+   'LibreTees, LLC', 'manual'),
 ]
 
 # The name of an image file (relative to this directory) to place at the top of
@@ -288,3 +289,8 @@ texinfo_documents = [
 
 # If true, do not generate a @detailmenu in the "Top" node's menu.
 #texinfo_no_detailmenu = False
+
+
+# Example configuration for intersphinx: refer to the Python standard library.
+intersphinx_mapping = {'python': ('https://docs.python.org/', None),
+                         'boto': ('https://boto.readthedocs.org/en/2.3.0/', None),}
