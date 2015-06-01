@@ -22,8 +22,66 @@ def connect_ec2():
 
 def create_security_group(vpc, name=None, database_backend=None, allowed_inbound_traffic=[], allowed_outbound_traffic=[]):
     """
-    Create Amazon EC2-VPC Security Group.
+    Create an Amazon EC2-VPC Security Group.
+
+    :type name: str
+    :param name: An *optional* name for the EC2-VPC security group. A name will
+        be generated from the current project name, if one is not specified.
+
+    :type database_backend: string
+    :param database_backend: An *optional* database backend. This is intended to
+        be used with application security groups that require outbound traffic
+        to a database.
+
+        * Supported database backends:
+
+            * ``postgresql``
+            * ``mysql``
+            * ``oracle``
+
+    :type allowed_inbound_traffic: list
+    :param allowed_inbound_traffic: A list of tuples in the format:
+        ``(protocol, cidr_block)`` or ``(protocol, security_group)``.
+
+        * **protocol** (*string*):
+
+            * ``HTTP``
+            * ``HTTPS``
+            * ``TCP:Port`` (e.g., ``TCP:80``)
+            * ``UDP:Port`` (e.g., ``UDP:1337``)
+
+        * **cidr_block** (*string*):
+
+            * A range of IP addresses from which inbound traffic is allowed.
+
+        * **security_group** (:class:`~boto.ec2.securitygroup.SecurityGroup`)
+
+            * A :class:`boto.ec2.securitygroup.SecurityGroup` that is allowed ingress into the created security group.
+
+    :type allowed_outbound_traffic: list
+    :param allowed_outbound_traffic: A list of tuples in the format:
+        ``(protocol, cidr_block)`` or ``(protocol, security_group)``.
+
+        * **protocol** (*string*):
+
+            * ``HTTP``
+            * ``HTTPS``
+            * ``DNS``
+            * ``TCP:Port`` (e.g., ``TCP:80``)
+            * ``UDP:Port`` (e.g., ``UDP:1337``)
+
+        * **cidr_block** (*string*):
+
+            * A range of IP addresses to which outbound traffic is allowed.
+
+        * **security_group** (:class:`~boto.ec2.securitygroup.SecurityGroup`)
+
+            * A :class:`boto.ec2.securitygroup.SecurityGroup` that is allowed egress from the created security group.
+
+    :rtype: :class:`boto.ec2.securitygroup.SecurityGroup`
+    :return: An Amazon EC2-VPC Security Group.
     """
+
     # Defer import to resolve interdependency between .database and .compute modules.
     from .database import INBOUND_PORT
 
