@@ -178,6 +178,34 @@ def create_security_group(vpc, name=None, database_backend=None, allowed_inbound
 
 
 def create_load_balancer(subnets, name=None, security_groups=None, ssl_certificate=None):
+    """
+    Create an Elastic Load Balancer (ELB).
+
+    :type subnets: list
+    :param subnets: A list of :class:`boto.vpc.subnet.Subnet` objects that
+        will share inbound traffic.
+
+    :type name: string
+    :param name: An *optional* name for the Load Balancer. A name will be
+        generated from the current project name, if one is not specified.
+
+    :type security_groups: list
+    :param security_groups: An *optional* list of
+        :class:`boto.ec2.securitygroup.SecurityGroup` objects that the Load
+        Balancer will join.
+
+        * See also: :func:`sky.compute.create_security_group`.
+
+    :type ssl_certificate: string
+    :param ssl_certificate: The Amazon Resource Name (ARN) of an uploaded SSL
+        Certificate. This is required only if HTTPS/SSL load balancer listeners
+        are desired.
+
+        * See also: :func:`sky.security.upload_ssl_certificate`.
+
+    :rtype: :class:`boto.ec2.elb.loadbalancer.LoadBalancer`
+    :return: An Elastic Load Balancer (ELB).
+    """
     # Connect to the Amazon EC2 Load Balancing (Amazon ELB) service.
     logger.debug('Connecting to the Amazon EC2 Load Balancing (Amazon ELB) service.')
     elb_connection = boto.connect_elb()
