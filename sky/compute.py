@@ -220,10 +220,6 @@ def create_load_balancer(vpc, subnets, name=None, security_groups=None, ssl_cert
             logger.error('Elastic Load Balancer (%s) was not found. Error %s: %s.' % (name, error.status, error.reason))
     logger.info('Deleted Elastic Load Balancer (%s).' % name)
 
-    # Create Security Group.
-    if not security_groups:
-        security_groups = create_security_group(vpc)
-
     # Set up basic HTTP listener.
     complex_listeners = [(80, 80, 'HTTP', 'HTTP')]
 
