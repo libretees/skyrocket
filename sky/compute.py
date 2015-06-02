@@ -176,7 +176,8 @@ def create_security_group(vpc, name=None, database_backend=None, allowed_inbound
 
     return security_group
 
-def create_load_balancer(vpc, subnets, name=None, security_groups=None, ssl_certificate=None):
+
+def create_load_balancer(subnets, name=None, security_groups=None, ssl_certificate=None):
     # Connect to the Amazon EC2 Load Balancing (Amazon ELB) service.
     logger.debug('Connecting to the Amazon EC2 Load Balancing (Amazon ELB) service.')
     elb_connection = boto.connect_elb()
@@ -200,6 +201,13 @@ def create_load_balancer(vpc, subnets, name=None, security_groups=None, ssl_cert
 
     # Set up default security group, if necessary
     if not security_groups:
+        # Connect to the Amazon Virtual Private Cloud (Amazon VPC) service.
+        vpc_connection = connect_vpc()
+
+        # Get VPC from Subnets.
+        vpc_id = subnets[-1].vpc_id
+        vpc = vpc_connection.get_all_vpcs(vpc_ids=[vpc_id])[-1]
+
         security_group_name = '-'.join(['gp', config['PROJECT_NAME'], config['ENVIRONMENT'], 'elb'])
         security_groups = [create_security_group(vpc,
                                                  name=security_group_name,
@@ -230,7 +238,7 @@ def create_load_balancer(vpc, subnets, name=None, security_groups=None, ssl_cert
     # Create Elastic Load Balancer (ELB).
     logger.info('Creating Elastic Load Balancer (%s).' % name)
     load_balancer = elb_connection.create_load_balancer(name, # name
-                                                        None,     # zones         - Valid only for load balancers in EC2-Classic.
+                                                        None, # zones             # Valid only for load balancers in EC2-Classic.
                                                         listeners=None,
                                                         subnets=[subnet.id for subnet in subnets],
                                                         security_groups=[security_group.id for security_group in security_groups],
