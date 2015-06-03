@@ -46,4 +46,4 @@ Once an infrastructure is defined, it may be deployed to AWS, like so::
 
 In addition to use via the ``sky`` tool, Sky's components may be imported
 into other Python code, providing a Pythonic interface to cloud services, such
-as Amazon Web Serveices.
+as Amazon Web Services.
