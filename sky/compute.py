@@ -33,11 +33,7 @@ def create_security_group(vpc, name=None, database_backend=None, allowed_inbound
         be used with application security groups that require outbound traffic
         to a database.
 
-        * Supported database backends:
-
-            * ``postgresql``
-            * ``mysql``
-            * ``oracle``
+        * Supported database backends: ``postgresql``, ``mysql``, and ``oracle``.
 
     :type allowed_inbound_traffic: list
     :param allowed_inbound_traffic: A list of tuples in the format:
@@ -45,10 +41,7 @@ def create_security_group(vpc, name=None, database_backend=None, allowed_inbound
 
         * **protocol** (*string*):
 
-            * ``HTTP``
-            * ``HTTPS``
-            * ``TCP:Port`` (e.g., ``TCP:80``)
-            * ``UDP:Port`` (e.g., ``UDP:1337``)
+            * Supported inbound protocols: ``HTTP``, ``HTTPS``, ``TCP:Port`` (e.g., ``TCP:80``), and ``UDP:Port`` (e.g., ``UDP:1337``).
 
         * **cidr_block** (*string*):
 
@@ -56,7 +49,7 @@ def create_security_group(vpc, name=None, database_backend=None, allowed_inbound
 
         * **security_group** (:class:`~boto.ec2.securitygroup.SecurityGroup`)
 
-            * A :class:`boto.ec2.securitygroup.SecurityGroup` that is allowed ingress into the created security group.
+            * A :class:`~boto.ec2.securitygroup.SecurityGroup` that the inbound traffic originates from.
 
     :type allowed_outbound_traffic: list
     :param allowed_outbound_traffic: A list of tuples in the format:
@@ -64,11 +57,7 @@ def create_security_group(vpc, name=None, database_backend=None, allowed_inbound
 
         * **protocol** (*string*):
 
-            * ``HTTP``
-            * ``HTTPS``
-            * ``DNS``
-            * ``TCP:Port`` (e.g., ``TCP:80``)
-            * ``UDP:Port`` (e.g., ``UDP:1337``)
+            * Supported outbound protocols: ``HTTP``, ``HTTPS``, ``DNS``, ``TCP:Port`` (e.g., ``TCP:80``), and ``UDP:Port`` (e.g., ``UDP:1337``).
 
         * **cidr_block** (*string*):
 
@@ -76,7 +65,7 @@ def create_security_group(vpc, name=None, database_backend=None, allowed_inbound
 
         * **security_group** (:class:`~boto.ec2.securitygroup.SecurityGroup`)
 
-            * A :class:`boto.ec2.securitygroup.SecurityGroup` that is allowed egress from the created security group.
+            * A :class:`~boto.ec2.securitygroup.SecurityGroup` that the outbound traffic is destined to.
 
     :rtype: :class:`boto.ec2.securitygroup.SecurityGroup`
     :return: An Amazon EC2-VPC Security Group.
@@ -182,7 +171,7 @@ def create_load_balancer(subnets, name=None, security_groups=None, ssl_certifica
     Create an Elastic Load Balancer (ELB).
 
     :type subnets: list
-    :param subnets: A list of :class:`boto.vpc.subnet.Subnet` objects that
+    :param subnets: A list of :class:`~boto.vpc.subnet.Subnet` objects that
         will share inbound traffic.
 
     :type name: string
@@ -191,7 +180,7 @@ def create_load_balancer(subnets, name=None, security_groups=None, ssl_certifica
 
     :type security_groups: list
     :param security_groups: An *optional* list of
-        :class:`boto.ec2.securitygroup.SecurityGroup` objects that the Load
+        :class:`~boto.ec2.securitygroup.SecurityGroup` objects that the Load
         Balancer will join.
 
         * See also: :func:`sky.compute.create_security_group`.
