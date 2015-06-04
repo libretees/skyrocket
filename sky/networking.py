@@ -326,6 +326,11 @@ def create_subnets(vpc, zones='All', count=1, byte_aligned=False, balanced=False
         existing_subnets = vpc_connection.get_all_subnets(filters={'vpc-id': vpc.id,
                                                                    'availability-zone': [zone.name for zone in zones],
                                                                    'tag:Type': 'public' if public else 'private',})
+
+        # Convert boto.resultset.ResultSet to a Subnet or to a list of Subnet objects.
+        existing_subnets = [subnet for subnet in existing_subnets] if len(existing_subnets) > 1 else existing_subnets[-1]
+
+        # Return list of existing subnets, if they exist.
         if len(existing_subnets) > 0:
             logger.info('Found existing %s Subnets (%s).' % (('Public' if public else 'Private'), \
                                                               ', '.join([subnet.tags['Name'] for subnet in existing_subnets])))
