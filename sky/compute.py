@@ -456,9 +456,22 @@ def create_nat_instance(public_subnet, private_subnet, name=None, security_group
 
     return nat_instance
 
-def create_instances(vpc, subnets, role=None, security_groups=None, script=None, instance_profile=None, os='ubuntu', image_id=None, key_name=None, internet_addressable=False):
+def create_instances(subnets, role=None, security_groups=None, script=None, instance_profile=None, os='ubuntu', image_id=None, key_name=None, internet_addressable=False):
+
     # Create a security group, if a security group was not specified.
     if not security_groups:
+        # Connect to the Amazon Virtual Private Cloud (Amazon VPC) service.
+        vpc_connection = connect_vpc()
+
+        # Get VPC from Subnets.
+        vpc_id = set([subnet.vpc_id for subnet in subnets])
+        if not len(vpc_id) == 1:
+            raise RuntimeError('The specified subnets (%s) must be parts of the same network.' % ', '.join([subnet.tags['Name'] for subnet in subnets]))
+        else:
+            vpc_id = next(iter(vpc_id))
+        vpc = vpc_connection.get_all_vpcs(vpc_ids=[vpc_id])[-1]
+
+        # Create a default security group.
         security_groups = [create_security_group(vpc, allowed_inbound_traffic=[('HTTP',   '0.0.0.0/0')
                                                                               ,('HTTPS',  '0.0.0.0/0')]
                                                     , allowed_outbound_traffic=[('HTTP',  '0.0.0.0/0')
