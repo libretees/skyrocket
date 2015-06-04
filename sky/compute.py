@@ -265,11 +265,13 @@ def create_load_balancer(subnets, name=None, security_groups=None, ssl_certifica
 
     return load_balancer
 
-def create_nat_instances(public_subnets, private_subnets, security_groups=None, image_id=None):
 
+def create_nat_instances(public_subnets, private_subnets, security_groups=None, image_id=None):
+    # Ensure that there is a one-to-one match between Public Subnets and Private Subnets.
     if not len(public_subnets) == len(private_subnets):
         raise RuntimeError('The number of Public/Private Subnets must match (Public: %d Private: %d).' % (len(public_subnets), len(private_subnets)))
 
+    # Pair Public and Private Subnets together by availability zone.
     subnet_pairs = list(zip(sorted(public_subnets, key=lambda x: x.availability_zone), sorted(private_subnets, key=lambda x: x.availability_zone)))
 
     # Create NAT instances.
@@ -391,7 +393,7 @@ def create_instances(vpc, subnets, role=None, security_groups=None, script=None,
     instances = list()
     for subnet in subnets:
         instance = create_instance(subnet, role=role, security_groups=security_groups, script=script, instance_profile=instance_profile, os=os, image_id=image_id, key_name=key_name, internet_addressable=internet_addressable)
-        instances = instances + instance
+        instances = instances.append(instance)
     return instances
 
 def create_instance(subnet, name=None, role=None, security_groups=None, script=None, instance_profile=None, os='ubuntu', image_id=None, key_name=None, internet_addressable=False):
@@ -481,9 +483,9 @@ def create_instance(subnet, name=None, role=None, security_groups=None, script=N
 
     # Refresh EC2 instance objects.
     reservations = ec2_connection.get_all_instances(instance_ids=[instance.id for instance in instances])
-    instances = [instance for reservation in reservations for instance in reservation.instances]
+    instance = next(instance for reservation in reservations for instance in reservation.instances)
 
-    return instances
+    return instance
 
 def get_nat_image(paravirtual=False):
     # Connect to the Amazon Elastic Compute Cloud (Amazon EC2) service.
