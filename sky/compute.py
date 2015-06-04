@@ -174,6 +174,8 @@ def create_load_balancer(subnets, name=None, security_groups=None, ssl_certifica
     :param subnets: A list of :class:`~boto.vpc.subnet.Subnet` objects that
         will share inbound traffic.
 
+        * See also: :func:`sky.networking.create_subnet`.
+
     :type name: string
     :param name: An *optional* name for the Load Balancer. A name will be
         generated from the current project name, if one is not specified.
@@ -195,6 +197,7 @@ def create_load_balancer(subnets, name=None, security_groups=None, ssl_certifica
     :rtype: :class:`boto.ec2.elb.loadbalancer.LoadBalancer`
     :return: An Elastic Load Balancer (ELB).
     """
+
     # Connect to the Amazon EC2 Load Balancing (Amazon ELB) service.
     logger.debug('Connecting to the Amazon EC2 Load Balancing (Amazon ELB) service.')
     elb_connection = boto.connect_elb()
@@ -267,6 +270,37 @@ def create_load_balancer(subnets, name=None, security_groups=None, ssl_certifica
 
 
 def create_nat_instances(public_subnets, private_subnets, security_groups=None, image_id=None):
+    '''
+    Create NAT (Network Address Translation) Instances.
+
+    :type public_subnets: list
+    :param public_subnets: A list of :class:`~boto.vpc.subnet.Subnet` objects
+        that the NAT Instances will route traffic from.
+
+        * See also: :func:`sky.networking.create_subnets`.
+
+    :type private_subnets: list
+    :param private_subnets: A list of :class:`~boto.vpc.subnet.Subnet` objects
+        that the NAT Instances will route traffic to.
+
+        * See also: :func:`sky.networking.create_subnets`.
+
+    :type security_groups: list
+    :param security_groups: An *optional* list of
+        :class:`~boto.ec2.securitygroup.SecurityGroup` objects that the NAT
+        Instances will join.
+
+        * See also: :func:`sky.compute.create_security_group`.
+
+    :type image_id: string
+    :param image_id: An *optional* AMI (Amazon Machine Image) ID that determines
+        the OS and Virtualization Type that the NAT Instance will use. By
+        default, this is the AMI ID returned by :func:`sky.compute.get_nat_image`.
+
+    :rtype: list
+    :return: A list of NAT :class:`~boto.ec2.instance.Instance` objects.
+    '''
+
     # Ensure that there is a one-to-one match between Public Subnets and Private Subnets.
     if not len(public_subnets) == len(private_subnets):
         raise RuntimeError('The number of Public/Private Subnets must match (Public: %d Private: %d).' % (len(public_subnets), len(private_subnets)))
@@ -323,7 +357,12 @@ def create_nat_instance(public_subnet, private_subnet, name=None, security_group
         image_id = get_nat_image()
 
     # Create NAT Instance.
-    nat_instance = create_instance(public_subnet, name=name, role='nat', security_groups=security_groups, image_id=image_id.id, internet_addressable=True)[0]
+    nat_instance = create_instance(public_subnet,
+                                   name=name,
+                                   role='nat',
+                                   security_groups=security_groups,
+                                   image_id=image_id.id,
+                                   internet_addressable=True)
 
     # Disable source/destination checking.
     ec2_connection.modify_instance_attribute(nat_instance.id, attribute='sourceDestCheck', value=False, dry_run=False)
