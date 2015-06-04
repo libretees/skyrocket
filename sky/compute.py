@@ -265,7 +265,7 @@ def create_load_balancer(subnets, name=None, security_groups=None, ssl_certifica
 
     return load_balancer
 
-def create_nat_instances(vpc, public_subnets, private_subnets, security_groups=None, image_id=None):
+def create_nat_instances(public_subnets, private_subnets, security_groups=None, image_id=None):
 
     if not len(public_subnets) == len(private_subnets):
         raise RuntimeError('The number of Public/Private Subnets must match (Public: %d Private: %d).' % (len(public_subnets), len(private_subnets)))
@@ -275,12 +275,12 @@ def create_nat_instances(vpc, public_subnets, private_subnets, security_groups=N
     # Create NAT instances.
     nat_instances = list()
     for (public_subnet, private_subnet) in subnet_pairs:
-        nat_instance = create_nat_instance(vpc, public_subnet, private_subnet, name=None, security_groups=None, image_id=None)
+        nat_instance = create_nat_instance(public_subnet, private_subnet, name=None, security_groups=None, image_id=None)
         nat_instances.append(nat_instance)
 
     return nat_instances
 
-def create_nat_instance(vpc, public_subnet, private_subnet, name=None, security_groups=None, image_id=None):
+def create_nat_instance(public_subnet, private_subnet, name=None, security_groups=None, image_id=None):
     # Connect to the Amazon Elastic Compute Cloud (Amazon EC2) service.
     ec2_connection = connect_ec2()
 
@@ -297,6 +297,14 @@ def create_nat_instance(vpc, public_subnet, private_subnet, name=None, security_
          if len(nat_instances):
              logger.info('Found existing NAT Server (%s).' % name)
              return nat_instances
+
+    # Get VPC from Subnets.
+    vpc_id = set([subnet.vpc_id for subnet in [public_subnet, private_subnet]])
+    if not len(vpc_id) == 1:
+        raise RuntimeError('The specified subnets (%s, %s) must be parts of the same network.' % (public_subnet.tags['Name'], private_subnet.tags['Name']))
+    else:
+        vpc_id = next(iter(vpc_id))
+    vpc = vpc_connection.get_all_vpcs(vpc_ids=[vpc_id])[-1]
 
     # Create Security Group, if one was not specified.
     if not security_groups:
