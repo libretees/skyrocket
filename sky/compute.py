@@ -294,11 +294,11 @@ def create_nat_instances(public_subnets, private_subnets, security_groups=None, 
 
     :type image_id: string
     :param image_id: An *optional* AMI (Amazon Machine Image) ID that determines
-        the OS and Virtualization Type that the NAT Instance will use. By
+        the OS and Virtualization Type that the NAT Instances will use. By
         default, this is the AMI ID returned by :func:`sky.compute.get_nat_image`.
 
     :rtype: list
-    :return: A list of NAT :class:`~boto.ec2.instance.Instance` objects.
+    :return: A list of NAT Instances.
     '''
 
     # Ensure that there is a one-to-one match between Public Subnets and Private Subnets.
@@ -316,7 +316,44 @@ def create_nat_instances(public_subnets, private_subnets, security_groups=None, 
 
     return nat_instances
 
+
 def create_nat_instance(public_subnet, private_subnet, name=None, security_groups=None, image_id=None):
+    '''
+    Create a NAT (Network Address Translation) Instance.
+
+    :type public_subnet: :class:`~boto.vpc.subnet.Subnet`
+    :param public_subnet: The subnet that the NAT Instance will route traffic
+        from.
+
+        * See also: :func:`sky.networking.create_subnet`.
+
+    :type private_subnet: :class:`~boto.vpc.subnet.Subnet`
+    :param private_subnet: The subnet that the NAT Instance will route traffic
+        to.
+
+        * See also: :func:`sky.networking.create_subnet`.
+
+    :type name: str
+    :param name: An *optional* name for the NAT Instance. A name will be
+        generated from the current project name, if one is not specified.
+
+    :type security_groups: list
+    :param security_groups: An *optional* list of
+        :class:`~boto.ec2.securitygroup.SecurityGroup` objects that the NAT
+        Instance will join.
+
+        * See also: :func:`sky.compute.create_security_group`.
+
+    :type image_id: string
+    :param image_id: An *optional* AMI (Amazon Machine Image) ID that determines
+        the OS and Virtualization Type that the NAT Instance will use. By
+        default, this is the AMI ID returned by
+        :func:`sky.compute.get_nat_image`.
+
+    :rtype: :class:`boto.ec2.instance.Instance`
+    :return: A NAT Instance.
+    '''
+
     # Connect to the Amazon Elastic Compute Cloud (Amazon EC2) service.
     ec2_connection = connect_ec2()
 
