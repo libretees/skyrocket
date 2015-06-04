@@ -36,8 +36,8 @@ Note that the ``infrastructure`` decorator denotes a function as a cloud
 resource, to be created by the ``sky`` command-line tool. This decorator takes
 an optional ``requires`` argument, where requisite infrastructure can be listed.
 
-A special ``ready`` Object allows downstream infrastructure to access resources
-that it depends on.
+A special ``ready`` Object allows infrastructure to access resources created
+earlier in deployment.
 
 Once an infrastructure is defined, it may be deployed to AWS, like so::
 
