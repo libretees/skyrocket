@@ -590,10 +590,15 @@ def create_instance(subnet, name=None, role=None, security_groups=None, script=N
     tagged = False
     while not tagged:
         try:
-            tagged = ec2_connection.create_tags([instance.id for instance in instances], {'Name': name,
-                                                                                          'Project': config['PROJECT_NAME'],
-                                                                                          'Environment': config['ENVIRONMENT'],
-                                                                                          'Role': role if role else '',})
+            # Set up tags.
+            tags = {'Name': name,
+                    'Project': config['PROJECT_NAME'],
+                    'Environment': config['ENVIRONMENT'],}
+            if role:
+                tags['Role'] = role
+
+            # Tag EC2 Instance.
+            tagged = ec2_connection.create_tags([instance.id for instance in instances], tags)
         except boto.exception.EC2ResponseError as error:
             if error.code == 'InvalidInstanceID.NotFound': # Instance hasn't registered with EC2 service yet.
                 pass
