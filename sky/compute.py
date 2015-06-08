@@ -731,7 +731,7 @@ def register_instances(load_balancer, instances):
 
     :type load_balancer: :class:`~boto.ec2.elb.loadbalancer.LoadBalancer`
     :param load_balancer: The `~boto.ec2.elb.loadbalancer.LoadBalancer` that
-        EC2 Instances will be registered to.
+        the EC2 Instances will be registered to.
 
     * See also: :func:`sky.compute.create_load_balancer`.
 
@@ -755,7 +755,24 @@ def register_instances(load_balancer, instances):
                                                               else instances[-1].tags['Name'], \
                                                               load_balancer.name))
 
+
 def deregister_instances(load_balancer, instances):
+    '''
+    Deregister EC2 Instances from an Elastic Load Balancer (ELB).
+
+    :type load_balancer: :class:`~boto.ec2.elb.loadbalancer.LoadBalancer`
+    :param load_balancer: The `~boto.ec2.elb.loadbalancer.LoadBalancer` that
+        the EC2 Instances will be removed from.
+
+    * See also: :func:`sky.compute.create_load_balancer`.
+
+    :type instances: list
+    :param instances: A list of EC2 :class:`~boto.ec2.instance.Instance` objects
+        that will be deregistered from the Elastic Load Balancer (ELB).
+
+        * See also: :func:`sky.compute.create_instances`.
+    '''
+
     # Connect to the Amazon EC2 Load Balancing (Amazon ELB) service.
     logger.debug('Connecting to the Amazon EC2 Load Balancing (Amazon ELB) service.')
     elb_connection = boto.connect_elb()
