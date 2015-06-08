@@ -725,10 +725,6 @@ def get_nat_image(paravirtual=False):
     return image
 
 
-def install_package(script, package_name):
-    script += '\n' + 'apt-get --yes --quiet install %s' % package_name
-    return script
-
 def register_instances(load_balancer, instances):
     # Connect to the Amazon EC2 Load Balancing (Amazon ELB) service.
     logger.debug('Connecting to the Amazon EC2 Load Balancing (Amazon ELB) service.')
