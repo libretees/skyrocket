@@ -709,7 +709,7 @@ def get_nat_image(paravirtual=False):
         NAT HVM image will be retrieved.
 
     :rtype: :class:`boto.ec2.image.Image`
-    :return: A NAT AMI :class:`~boto.ec2.image.Image`.
+    :return: A NAT :class:`~boto.ec2.image.Image`.
     '''
 
     # Connect to the Amazon Elastic Compute Cloud (Amazon EC2) service.
@@ -729,11 +729,14 @@ def register_instances(load_balancer, instances):
     '''
     Register EC2 Instances with an Elastic Load Balancer (ELB).
 
+    * See also: :func:`sky.compute.deregister_instances` and
+        :func:`sky.compute.rotate_instances`.
+
     :type load_balancer: :class:`~boto.ec2.elb.loadbalancer.LoadBalancer`
     :param load_balancer: The `~boto.ec2.elb.loadbalancer.LoadBalancer` that
         the EC2 Instances will be registered to.
 
-    * See also: :func:`sky.compute.create_load_balancer`.
+        * See also: :func:`sky.compute.create_load_balancer`.
 
     :type instances: list
     :param instances: A list of EC2 :class:`~boto.ec2.instance.Instance` objects
@@ -760,11 +763,14 @@ def deregister_instances(load_balancer, instances):
     '''
     Deregister EC2 Instances from an Elastic Load Balancer (ELB).
 
+    * See also: :func:`sky.compute.register_instances` and
+        :func:`sky.compute.rotate_instances`.
+
     :type load_balancer: :class:`~boto.ec2.elb.loadbalancer.LoadBalancer`
     :param load_balancer: The `~boto.ec2.elb.loadbalancer.LoadBalancer` that
         the EC2 Instances will be removed from.
 
-    * See also: :func:`sky.compute.create_load_balancer`.
+        * See also: :func:`sky.compute.create_load_balancer`.
 
     :type instances: list
     :param instances: A list of EC2 :class:`~boto.ec2.instance.Instance` objects
@@ -785,6 +791,7 @@ def deregister_instances(load_balancer, instances):
     logger.info('Deregistered (%s) from Load Balancer (%s).' % (', '.join([instance.tags['Name'] for instance in instances]) if len(instances) > 1 \
                                                                 else instances[-1].tags['Name'], \
                                                                 load_balancer.name))
+
 
 def get_instances(name=None, role=None, state='running'):
     # Connect to the Amazon Elastic Compute Cloud (Amazon EC2) service.
@@ -809,8 +816,21 @@ def get_instances(name=None, role=None, state='running'):
     instances = [instance for reservation in reservations for instance in reservation.instances]
     
     return instances
-    
+
+
 def terminate_instances(instances):
+    '''
+    Terminate EC2 Instances.
+
+    **Warning**: On an EBS-backed instance, the default action is for the root
+        EBS volume to be deleted when the instance is terminated. Storage on any
+        local drives will be lost.
+
+    :type instances: list
+    :param instances: A list of EC2 :class:`~boto.ec2.instance.Instance` objects
+        that will be terminated.
+    '''
+
     # Connect to the Amazon Elastic Compute Cloud (Amazon EC2) service.
     ec2_connection = connect_ec2()
     
@@ -821,6 +841,7 @@ def terminate_instances(instances):
         ec2_connection.terminate_instances(instance_ids=[instance.id for instance in instances])
         logger.info('Terminated (%s).' % (', '.join([instance.tags['Name'] for instance in instances]) if len(instances) > 1 \
                                                     else instances[-1].tags['Name']))
+
 
 def rotate_instances(load_balancer, instances, terminate_outgoing_instances=True):
     # Connect to the Amazon Elastic Compute Cloud (Amazon EC2) service.
