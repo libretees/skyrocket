@@ -456,6 +456,7 @@ def create_nat_instance(public_subnet, private_subnet, name=None, security_group
 
     return nat_instance
 
+
 def create_instances(subnets, role=None, security_groups=None, script=None, instance_profile=None, os='ubuntu', image_id=None, key_name=None, internet_addressable=False):
     '''
     Create EC2 Instances across subnets.
@@ -505,8 +506,9 @@ def create_instances(subnets, role=None, security_groups=None, script=None, inst
 
     :type internet_addressable: bool
     :param internet_addressable: Specifies whether or not the EC2 Instance will
-        be accessible via the internet. If set to ``True``, a Public IP address
-        will be associated to the EC2 Instance.
+        be accessible via the Internet. If set to ``True``, a Public IP address
+        will be associated to the EC2 Instance. By default, an EC2 Instance is
+        *not* Internet-addressable.
 
     :rtype: list
     :return: A list of EC2 :class:`~boto.ec2.instance.Instance` objects.
@@ -538,6 +540,7 @@ def create_instances(subnets, role=None, security_groups=None, script=None, inst
         instance = create_instance(subnet, role=role, security_groups=security_groups, script=script, instance_profile=instance_profile, os=os, image_id=image_id, key_name=key_name, internet_addressable=internet_addressable)
         instances = instances.append(instance)
     return instances
+
 
 def create_instance(subnet, name=None, role=None, security_groups=None, script=None, instance_profile=None, os='ubuntu', image_id=None, key_name=None, internet_addressable=False):
     '''
@@ -591,8 +594,9 @@ def create_instance(subnet, name=None, role=None, security_groups=None, script=N
 
     :type internet_addressable: bool
     :param internet_addressable: Specifies whether or not the EC2 Instance will
-        be accessible via the internet. If set to ``True``, a Public IP address
-        will be associated to the EC2 Instance.
+        be accessible via the Internet. If set to ``True``, a Public IP address
+        will be associated to the EC2 Instance. By default, an EC2 Instance is
+        *not* Internet-addressable.
 
     :rtype: :class:`boto.ec2.instance.Instance`
     :return: An EC2 Instance.
@@ -693,7 +697,20 @@ def create_instance(subnet, name=None, role=None, security_groups=None, script=N
 
     return instance
 
+
 def get_nat_image(paravirtual=False):
+    '''
+    Retrieve the most-recent Amazon Linux NAT AMI from the AWS Marketplace.
+
+    :type paravirtual: bool
+    :param paravirtual: Specifies whether or not the NAT AMI virtualization type
+        is paravirtual or (PV) or hardware virtual machine (HVM). By default, a
+        NAT HVM image will be retrieved.
+
+    :rtype: :class:`boto.ec2.image.Image`
+    :return: A NAT AMI :class:`~boto.ec2.image.Image`.
+    '''
+
     # Connect to the Amazon Elastic Compute Cloud (Amazon EC2) service.
     ec2_connection = connect_ec2()
 
@@ -703,6 +720,7 @@ def get_nat_image(paravirtual=False):
 
     # Return the most recent AMI.
     image = sorted(images, key=lambda x: x.name.split('-')[5])[-1]
+
     return image
 
 def run(script, command):
