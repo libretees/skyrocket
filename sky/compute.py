@@ -846,6 +846,8 @@ def terminate_instances(instances):
     :type instances: list
     :param instances: A list of EC2 :class:`~boto.ec2.instance.Instance` objects
         that will be terminated.
+
+        * See also: :func:`sky.compute.create_instances`.
     '''
 
     # Connect to the Amazon Elastic Compute Cloud (Amazon EC2) service.
