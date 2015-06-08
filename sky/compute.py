@@ -391,14 +391,15 @@ def create_nat_instance(public_subnet, private_subnet, name=None, security_group
 
     # Get Amazon Linux VPC NAT AMI, if one was not specified.
     if not image_id:
-        image_id = get_nat_image()
+        image = get_nat_image()
+        image_id = image.id
 
     # Create NAT Instance.
     nat_instance = create_instance(public_subnet,
                                    name=name,
                                    role='nat',
                                    security_groups=security_groups,
-                                   image_id=image_id.id,
+                                   image_id=image_id,
                                    internet_addressable=True)
 
     # Disable source/destination checking.
