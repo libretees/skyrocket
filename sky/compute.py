@@ -726,6 +726,22 @@ def get_nat_image(paravirtual=False):
 
 
 def register_instances(load_balancer, instances):
+    '''
+    Register EC2 Instances with an Elastic Load Balancer (ELB).
+
+    :type load_balancer: :class:`~boto.ec2.elb.loadbalancer.LoadBalancer`
+    :param load_balancer: The `~boto.ec2.elb.loadbalancer.LoadBalancer` that
+        EC2 Instances will be registered to.
+
+    * See also: :func:`sky.compute.create_load_balancer`.
+
+    :type instances: list
+    :param instances: A list of EC2 :class:`~boto.ec2.instance.Instance` objects
+        that will be registered to the Elastic Load Balancer (ELB).
+
+        * See also: :func:`sky.compute.create_instances`.
+    '''
+
     # Connect to the Amazon EC2 Load Balancing (Amazon ELB) service.
     logger.debug('Connecting to the Amazon EC2 Load Balancing (Amazon ELB) service.')
     elb_connection = boto.connect_elb()
