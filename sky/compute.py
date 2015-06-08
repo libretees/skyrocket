@@ -506,10 +506,10 @@ def create_instances(subnets, role=None, security_groups=None, script=None, inst
         specified if remote access to the server is desired.
 
     :type internet_addressable: bool
-    :param internet_addressable: Specifies whether or not the EC2 Instance will
-        be accessible via the Internet. If set to ``True``, a Public IP address
-        will be associated to the EC2 Instance. By default, an EC2 Instance is
-        *not* Internet-addressable.
+    :param internet_addressable: Specifies whether the EC2 Instances will be
+        accessible via the Internet. If set to ``True``, a Public IP address
+        will be associated to the EC2 Instances. By default, the EC2 Instances
+        are *not* Internet-addressable.
 
     :rtype: list
     :return: A list of EC2 :class:`~boto.ec2.instance.Instance` objects.
@@ -594,8 +594,8 @@ def create_instance(subnet, name=None, role=None, security_groups=None, script=N
         specified if remote access to the server is desired.
 
     :type internet_addressable: bool
-    :param internet_addressable: Specifies whether or not the EC2 Instance will
-        be accessible via the Internet. If set to ``True``, a Public IP address
+    :param internet_addressable: Specifies whether the EC2 Instance will be
+        accessible via the Internet. If set to ``True``, a Public IP address
         will be associated to the EC2 Instance. By default, an EC2 Instance is
         *not* Internet-addressable.
 
@@ -704,9 +704,9 @@ def get_nat_image(paravirtual=False):
     Retrieve the most-recent Amazon Linux NAT AMI from the AWS Marketplace.
 
     :type paravirtual: bool
-    :param paravirtual: Specifies whether or not the NAT AMI virtualization type
-        is paravirtual or (PV) or hardware virtual machine (HVM). By default, a
-        NAT HVM image will be retrieved.
+    :param paravirtual: Specifies whether the NAT AMI virtualization type is
+        paravirtual or (PV) or hardware virtual machine (HVM). By default, a NAT
+        HVM image will be retrieved.
 
     :rtype: :class:`boto.ec2.image.Image`
     :return: A NAT :class:`~boto.ec2.image.Image`.
@@ -729,8 +729,7 @@ def register_instances(load_balancer, instances):
     '''
     Register EC2 Instances with an Elastic Load Balancer (ELB).
 
-    * See also: :func:`sky.compute.deregister_instances` and
-        :func:`sky.compute.rotate_instances`.
+    * See also: :func:`sky.compute.deregister_instances` and :func:`sky.compute.rotate_instances`.
 
     :type load_balancer: :class:`~boto.ec2.elb.loadbalancer.LoadBalancer`
     :param load_balancer: The `~boto.ec2.elb.loadbalancer.LoadBalancer` that
@@ -763,8 +762,7 @@ def deregister_instances(load_balancer, instances):
     '''
     Deregister EC2 Instances from an Elastic Load Balancer (ELB).
 
-    * See also: :func:`sky.compute.register_instances` and
-        :func:`sky.compute.rotate_instances`.
+    * See also: :func:`sky.compute.register_instances` and :func:`sky.compute.rotate_instances`.
 
     :type load_balancer: :class:`~boto.ec2.elb.loadbalancer.LoadBalancer`
     :param load_balancer: The `~boto.ec2.elb.loadbalancer.LoadBalancer` that
@@ -822,9 +820,7 @@ def terminate_instances(instances):
     '''
     Terminate EC2 Instances.
 
-    **Warning**: On an EBS-backed instance, the default action is for the root
-        EBS volume to be deleted when the instance is terminated. Storage on any
-        local drives will be lost.
+    **Warning: On an EBS-backed instance, the default action is for the root EBS volume to be deleted when the instance is terminated. Storage on any local drives will be lost.**
 
     :type instances: list
     :param instances: A list of EC2 :class:`~boto.ec2.instance.Instance` objects
@@ -844,6 +840,32 @@ def terminate_instances(instances):
 
 
 def rotate_instances(load_balancer, instances, terminate_outgoing_instances=True):
+    '''
+    Replace old EC2 Instances with new EC2 Instances from behind an Elastic Load Balancer (ELB).
+
+    This can be used to carry out seamless deployments. If EC2 Instances are currently registered to the ELB, they will be deregistered *and optionally terminated* only after incoming EC2 Instances pass a Health Check.
+
+    :type load_balancer: :class:`~boto.ec2.elb.loadbalancer.LoadBalancer`
+    :param load_balancer: The `~boto.ec2.elb.loadbalancer.LoadBalancer` that
+        the EC2 Instances will be registered to or removed from.
+
+        * See also: :func:`sky.compute.create_load_balancer`.
+
+    :type instances: list
+    :param instances: A list of EC2 :class:`~boto.ec2.instance.Instance` objects
+        that will be registered to the Elastic Load Balancer (ELB).
+
+        * See also: :func:`sky.compute.create_instances`.
+
+    :type terminate_outgoing_instances: bool
+    :param terminate_outgoing_instances: Specifies whether outgoing EC2
+        Instances will be terminated. By default, EC2 Instances will be
+        terminated after they have been deregistered from the Elastic Load
+        Balancer (ELB).
+
+        * See also: :func:`sky.compute.terminate_instances`.
+    '''
+
     # Connect to the Amazon Elastic Compute Cloud (Amazon EC2) service.
     ec2_connection = connect_ec2()
 
