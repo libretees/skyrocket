@@ -106,10 +106,11 @@ def create_role(inline_policies):
 
     # Set up Instance Profile.
     instance_profile_name = '-'.join(['role', config['PROJECT_NAME'], config['ENVIRONMENT']])
-    instance_profile = iam_connection.create_instance_profile(instance_profile_name)
-    instance_profile.name = instance_profile_name
+    response = iam_connection.create_instance_profile(instance_profile_name)
+    instance_profile = response['create_instance_profile_response']\
+                               ['create_instance_profile_result']\
+                               ['instance_profile']
     iam_connection.add_role_to_instance_profile(instance_profile_name, role_name)
-
 
     # Attach Inline Policies to Role.
     for inline_policy in inline_policies:

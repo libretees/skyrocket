@@ -641,7 +641,7 @@ def create_instance(subnet, name=None, role=None, security_groups=None, script=N
     reservation = ec2_connection.run_instances(image_id,                 # image_id
                                                key_name=key_name,
                                                instance_type='t2.micro',
-                                               instance_profile_name=instance_profile.name if instance_profile else None,
+                                               instance_profile_name=instance_profile['instance_profile_name'] if instance_profile else None,
                                                network_interfaces=interfaces,
                                                user_data=script)
     logger.info('Created EC2 Instance (%s).' % name)
