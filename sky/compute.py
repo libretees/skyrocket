@@ -792,6 +792,27 @@ def deregister_instances(load_balancer, instances):
 
 
 def get_instances(name=None, role=None, state='running'):
+    '''
+    Query EC2 Instances.
+
+    * See also: :func:`sky.compute.create_instances`.
+
+    :type name: str
+    :param name: *Optional*. The name of the EC2 Instance that is being queried.
+    
+    :type role: str
+    :param role: *Optional*. The role of the EC2 Instance that is being queried.
+
+    :type state: str
+    :param state: An *optional* EC2 Instance state. Valid values are
+        ``pending``, ``running``, ``shutting-down``, ``terminated``,
+        ``stopping``, and ``stopped``. By default, EC2 Instances in the
+        ``running`` state are returned.
+
+    :rtype: list
+    :return: A list of EC2 :class:`~boto.ec2.instance.Instance` objects.
+   '''
+
     # Connect to the Amazon Elastic Compute Cloud (Amazon EC2) service.
     ec2_connection = connect_ec2()
 
