@@ -298,7 +298,7 @@ def create_nat_instances(public_subnets, private_subnets, security_groups=None, 
         default, this is the AMI ID returned by :func:`sky.compute.get_nat_image`.
 
     :rtype: list
-    :return: A list of NAT Instances.
+    :return: A list of NAT :class:`~boto.ec2.instance.Instance` objects.
     '''
 
     # Ensure that there is a one-to-one match between Public Subnets and Private Subnets.
@@ -458,11 +458,11 @@ def create_nat_instance(public_subnet, private_subnet, name=None, security_group
 
 def create_instances(subnets, role=None, security_groups=None, script=None, instance_profile=None, os='ubuntu', image_id=None, key_name=None, internet_addressable=False):
     '''
-    Create an EC2 Instance across subnets.
+    Create EC2 Instances across subnets.
 
     :type subnets: list
     :param subnets: A list of :class:`~boto.vpc.subnet.Subnet` objects
-        that the Instances will be created in.
+        that the EC2 Instances will be created in.
 
         * See also: :func:`sky.networking.create_subnets`.
 
@@ -492,24 +492,24 @@ def create_instances(subnets, role=None, security_groups=None, script=None, inst
 
     :type os: str
     :param os: The OS that will run on the EC2 Instance. For convenience,
-        ``amazon-linux``, ``redhat``, ``suse``, and ``ubuntu`` are provided.
+        ``amazon-linux``, ``redhat``, ``suse``, and ``ubuntu`` are available.
 
     :type image_id: str
     :param image_id: The Amazon Machine Image (AMI) that will run on the EC2
-        Instance. If both the ``os`` and ``image_id`` parameters are specified,
-        the ``image_id`` parameter will take precedence.
+        Instance. Note that if both the ``os`` and ``image_id`` parameters are
+        specified, the ``image_id`` parameter will take precedence.
 
     :type key_name: str
     :param key_name: An *optional* Amazon EC2 Key Pair name. This should be
-        specified if remote access to the server is required.
+        specified if remote access to the server is desired.
 
     :type internet_addressable: bool
-    :param internet_addressable: Whether or not the EC2 Instance should be
-        accessible via the internet. If set to ``True``, a Public IP address
+    :param internet_addressable: Specifies whether or not the EC2 Instance will
+        be accessible via the internet. If set to ``True``, a Public IP address
         will be associated to the EC2 Instance.
 
-    :rtype: :class:`boto.ec2.instance.Instance`
-    :return: An EC2 Instance.
+    :rtype: list
+    :return: A list of EC2 :class:`~boto.ec2.instance.Instance` objects.
     '''
 
     # Create a security group, if a security group was not specified.
@@ -540,6 +540,64 @@ def create_instances(subnets, role=None, security_groups=None, script=None, inst
     return instances
 
 def create_instance(subnet, name=None, role=None, security_groups=None, script=None, instance_profile=None, os='ubuntu', image_id=None, key_name=None, internet_addressable=False):
+    '''
+    Create an EC2 Instance.
+
+    :type subnet: :class:`~boto.vpc.subnet.Subnet`
+    :param subnet: The Subnet that the EC2 Instance will be created in.
+
+        * See also: :func:`sky.networking.create_subnet`.
+
+    :type name: str
+    :param name: An *optional* name for the EC2 Instance. A name will be
+        generated from the current project name, if one is not specified.
+
+    :type role: str
+    :param role: An *optional* role for the EC2 Instance. This string will be
+        added to the EC2 Instance's tags, if specified.
+
+    :type security_groups: list
+    :param security_groups: An *optional* list of
+        :class:`~boto.ec2.securitygroup.SecurityGroup` objects that the EC2
+        Instance will join.
+
+        * See also: :func:`sky.compute.create_security_group`.
+
+    :type script: str
+    :param script: An *optional* user-data script that is executed when the EC2
+        Instance is run for the first time.
+
+        * See also: :func:`sky.utils.get_script`.
+
+    :type instance_profile: :class:`~boto.jsonresponse.Element`
+    :param instance_profile: An *optional* IAM Instance Profile for the EC2
+        Instance. This grants permission for an EC2 Instance to perform
+        interactions with other AWS resources.
+
+        * See also: :func:`sky.security.create_role`.
+
+    :type os: str
+    :param os: The OS that will run on the EC2 Instance. For convenience,
+        ``amazon-linux``, ``redhat``, ``suse``, and ``ubuntu`` are available.
+
+    :type image_id: str
+    :param image_id: The Amazon Machine Image (AMI) that will run on the EC2
+        Instance. Note that if both the ``os`` and ``image_id`` parameters are
+        specified, the ``image_id`` parameter will take precedence.
+
+    :type key_name: str
+    :param key_name: An *optional* Amazon EC2 Key Pair name. This should be
+        specified if remote access to the server is desired.
+
+    :type internet_addressable: bool
+    :param internet_addressable: Specifies whether or not the EC2 Instance will
+        be accessible via the internet. If set to ``True``, a Public IP address
+        will be associated to the EC2 Instance.
+
+    :rtype: :class:`boto.ec2.instance.Instance`
+    :return: An EC2 Instance.
+    '''
+
     # Set up dictionary of OSes and their associated quick-start Amazon Machine Images (AMIs).
     ami = {
         'amazon-linux': 'ami-146e2a7c',
