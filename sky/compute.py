@@ -724,9 +724,6 @@ def get_nat_image(paravirtual=False):
 
     return image
 
-def run(script, command):
-    script += '\n' + command
-    return script
 
 def install_package(script, package_name):
     script += '\n' + 'apt-get --yes --quiet install %s' % package_name
