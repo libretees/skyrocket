@@ -22,6 +22,9 @@ Contents:
 .. automodule:: sky.compute
    :members:
 
+.. automodule:: sky.database
+   :members:
+
 Indices and tables
 ==================
 
