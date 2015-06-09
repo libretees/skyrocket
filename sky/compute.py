@@ -174,7 +174,7 @@ def create_load_balancer(subnets, name=None, security_groups=None, ssl_certifica
     :param subnets: A list of :class:`~boto.vpc.subnet.Subnet` objects that
         will share inbound traffic.
 
-        * See also: :func:`sky.networking.create_subnet`.
+        * See also: :func:`sky.networking.create_subnets`.
 
     :type name: string
     :param name: An *optional* name for the Load Balancer. A name will be
