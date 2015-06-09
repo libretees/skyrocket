@@ -161,6 +161,27 @@ def create_db_subnet_group(subnets, name=None):
     return subnet
 
 def create_option_group(name=None, engine='postgresql'):
+    """
+    Create an Option Group.
+
+    An option group can specify features, called options, that are available
+    for a particular Amazon RDS DB instance. Options can have settings that
+    specify how the option works.
+
+    :type name: str
+    :param name: An *optional* name for the Option Group. A name will be
+        generated from the current project name, if one is not specified.
+
+    :type engine: string
+    :param engine: The database engine that is configured by the Option Group.
+        This is set to ``postgresql``, by default.
+
+        * Supported database engines: ``postgresql``, ``mysql``, and ``oracle``.
+
+    :rtype: dict
+    :return: A dictionary containing the elements of the AWS API ``CreateOptionGroupResponse`` response.
+    """
+
     # Connect to the Amazon Relational Database Service (Amazon RDS).
     rds_connection = connect_rds()
 
