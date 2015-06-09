@@ -43,6 +43,23 @@ def connect_rds():
     return rds
 
 def create_db_parameter_group(name=None, engine='postgresql'):
+    """
+    Create a DB Parameter Group.
+
+    :type name: str
+    :param name: An *optional* name for the DB Parameter Group. A name will
+        be generated from the current project name, if one is not specified.
+
+    :type engine: string
+    :param engine: The database engine that is configured by the DB Parameter
+        Group. This is set to ``postgresql``, by default.
+
+        * Supported database engines: ``postgresql``, ``mysql``, and ``oracle``.
+
+    :rtype: dict
+    :return: A dictionary containing the elements of the AWS API ``CreateDBParameterGroupResponse`` response.
+    """
+
     # Connect to the Amazon Relational Database Service (Amazon RDS).
     rds_connection = connect_rds()
 
