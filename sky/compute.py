@@ -24,6 +24,10 @@ def create_security_group(vpc, name=None, database_backend=None, allowed_inbound
     """
     Create an Amazon EC2-VPC Security Group.
 
+    :type vpc: :class:`boto.vpc.vpc.VPC`
+    :param vpc: The :class:`~boto.vpc.vpc.VPC` that the Security Group will
+        join.
+
     :type name: str
     :param name: An *optional* name for the EC2-VPC security group. A name will
         be generated from the current project name, if one is not specified.
@@ -321,13 +325,13 @@ def create_nat_instance(public_subnet, private_subnet, name=None, security_group
     '''
     Create a NAT (Network Address Translation) Instance.
 
-    :type public_subnet: :class:`~boto.vpc.subnet.Subnet`
+    :type public_subnet: :class:`boto.vpc.subnet.Subnet`
     :param public_subnet: The subnet that the NAT Instance will route traffic
         from.
 
         * See also: :func:`sky.networking.create_subnet`.
 
-    :type private_subnet: :class:`~boto.vpc.subnet.Subnet`
+    :type private_subnet: :class:`boto.vpc.subnet.Subnet`
     :param private_subnet: The subnet that the NAT Instance will route traffic
         to.
 
@@ -485,7 +489,7 @@ def create_instances(subnets, role=None, security_groups=None, script=None, inst
 
         * See also: :func:`sky.utils.get_script`.
 
-    :type instance_profile: :class:`~boto.jsonresponse.Element`
+    :type instance_profile: :class:`boto.jsonresponse.Element`
     :param instance_profile: An *optional* IAM Instance Profile for the EC2
         Instance. This grants permission for an EC2 Instance to perform
         interactions with other AWS resources.
@@ -547,7 +551,7 @@ def create_instance(subnet, name=None, role=None, security_groups=None, script=N
     '''
     Create an EC2 Instance.
 
-    :type subnet: :class:`~boto.vpc.subnet.Subnet`
+    :type subnet: :class:`boto.vpc.subnet.Subnet`
     :param subnet: The Subnet that the EC2 Instance will be created in.
 
         * See also: :func:`sky.networking.create_subnet`.
@@ -573,7 +577,7 @@ def create_instance(subnet, name=None, role=None, security_groups=None, script=N
 
         * See also: :func:`sky.utils.get_script`.
 
-    :type instance_profile: :class:`~boto.jsonresponse.Element`
+    :type instance_profile: :class:`boto.jsonresponse.Element`
     :param instance_profile: An *optional* IAM Instance Profile for the EC2
         Instance. This grants permission for an EC2 Instance to perform
         interactions with other AWS resources.
@@ -731,9 +735,9 @@ def register_instances(load_balancer, instances):
 
     * See also: :func:`sky.compute.deregister_instances` and :func:`sky.compute.rotate_instances`.
 
-    :type load_balancer: :class:`~boto.ec2.elb.loadbalancer.LoadBalancer`
-    :param load_balancer: The `~boto.ec2.elb.loadbalancer.LoadBalancer` that
-        the EC2 Instances will be registered to.
+    :type load_balancer: :class:`boto.ec2.elb.loadbalancer.LoadBalancer`
+    :param load_balancer: The :class:`~boto.ec2.elb.loadbalancer.LoadBalancer`
+        that the EC2 Instances will be registered to.
 
         * See also: :func:`sky.compute.create_load_balancer`.
 
@@ -764,9 +768,9 @@ def deregister_instances(load_balancer, instances):
 
     * See also: :func:`sky.compute.register_instances` and :func:`sky.compute.rotate_instances`.
 
-    :type load_balancer: :class:`~boto.ec2.elb.loadbalancer.LoadBalancer`
-    :param load_balancer: The `~boto.ec2.elb.loadbalancer.LoadBalancer` that
-        the EC2 Instances will be removed from.
+    :type load_balancer: :class:`boto.ec2.elb.loadbalancer.LoadBalancer`
+    :param load_balancer: The :class:`~boto.ec2.elb.loadbalancer.LoadBalancer`
+        that the EC2 Instances will be removed from.
 
         * See also: :func:`sky.compute.create_load_balancer`.
 
@@ -868,9 +872,9 @@ def rotate_instances(load_balancer, instances, terminate_outgoing_instances=True
 
     This can be used to carry out seamless deployments. If EC2 Instances are currently registered to the ELB, they will be deregistered *and optionally terminated* only after incoming EC2 Instances pass a Health Check.
 
-    :type load_balancer: :class:`~boto.ec2.elb.loadbalancer.LoadBalancer`
-    :param load_balancer: The `~boto.ec2.elb.loadbalancer.LoadBalancer` that
-        the EC2 Instances will be registered to or removed from.
+    :type load_balancer: :class:`boto.ec2.elb.loadbalancer.LoadBalancer`
+    :param load_balancer: The :class:`~boto.ec2.elb.loadbalancer.LoadBalancer`
+        that the EC2 Instances will be registered to or removed from.
 
         * See also: :func:`sky.compute.create_load_balancer`.
 
