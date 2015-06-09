@@ -285,7 +285,6 @@ def create_database(vpc, subnets, name=None, engine='postgresql', storage=5, app
             application_security_group_ids |= set([group.id for group in application_security_groups])
 
         inbound_rules = list()
-        outbound_rules = list()
         for application_security_group_id in application_security_group_ids:
             inbound_rule = ('TCP:' + str(INBOUND_PORT[engine]), application_security_group_id)
             inbound_rules.append(inbound_rule)
