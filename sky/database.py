@@ -101,10 +101,14 @@ def create_db_subnet_group(subnets, name=None):
     Create a DB Subnet Group.
 
     :type subnets: list
-    :param subnets: A list of :class:`~boto.vpc.subnet.Subnet` objects that
-        are located in different Availablity Zones (AZs) of the same Region.
-        These define where the database will be created and where the database
-        will be replicated to.
+    :param subnets: A list of at least two :class:`~boto.vpc.subnet.Subnet`
+        objects that are located in different Availablity Zones (AZs) of the
+        same Region.
+
+        For Multi-AZ deployments, these define where the database
+        will be created and where the database will be replicated . For
+        Single-AZ deployments, these are defined so that it is possible to
+        convert the database to Multi-AZ at a later point.
 
         * See also: :func:`sky.networking.create_subnets`.
 
