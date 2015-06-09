@@ -97,6 +97,25 @@ def create_db_parameter_group(name=None, engine='postgresql'):
     return db_parameter_group
 
 def create_db_subnet_group(subnets, name=None):
+    """
+    Create a DB Subnet Group.
+
+    :type subnets: list
+    :param subnets: A list of :class:`~boto.vpc.subnet.Subnet` objects that
+        are located in different Availablity Zones (AZs) of the same Region.
+        These define where the database will be created and where the database
+        will be replicated to.
+
+        * See also: :func:`sky.networking.create_subnets`.
+
+    :type name: str
+    :param name: An *optional* name for the DB Subnet Group. A name will
+        be generated from the current project name, if one is not specified.
+
+    :rtype: dict
+    :return: A dictionary containing the elements of the AWS API ``CreateDBSubnetGroupResponse`` response.
+    """
+
     # Connect to the Amazon Relational Database Service (Amazon RDS).
     rds_connection = connect_rds()
 
@@ -116,9 +135,9 @@ def create_db_subnet_group(subnets, name=None):
     # Create Database Subnet Group.
     subnet = None
     try:
-        subnet = rds_connection.create_db_subnet_group(name,                                        #db_subnet_group_name
+        subnet = rds_connection.create_db_subnet_group(name,                                                  #db_subnet_group_name
                                                        ' '.join([config['PROJECT_NAME'], 'DB Subnet Group']), #db_subnet_group_description
-                                                       [subnet.id for subnet in subnets])           #subnet_ids
+                                                       [subnet.id for subnet in subnets])                     #subnet_ids
     except boto.rds2.exceptions.DBSubnetGroupAlreadyExists as error:
         if error.code == 'DBSubnetGroupAlreadyExists':
             subnet = rds_connection.describe_db_subnet_groups(name)
