@@ -3,6 +3,7 @@ import time
 import logging
 import boto
 from .compute import create_security_group
+from .networking import connect_vpc
 from .state import config, mode
 
 logger = logging.getLogger(__name__)
@@ -223,12 +224,9 @@ def create_option_group(name=None, engine='postgresql'):
     return option_group
 
 
-def create_database(vpc, subnets, name=None, engine='postgresql', storage=5, application_instances=None, application_security_groups=None, security_groups=None, publicly_accessible=False, multi_az=False, db_parameter_group=None, option_group=None):
+def create_database(subnets, name=None, engine='postgresql', storage=5, application_instances=None, application_security_groups=None, security_groups=None, publicly_accessible=False, multi_az=False, db_parameter_group=None, option_group=None):
     """
     Create Database Instance.
-
-    :type vpc: :class:`boto.vpc.vpc.VPC`
-    :param vpc: The :class:`~boto.vpc.vpc.VPC` that the DB Instance will join.
 
     :type subnets: list
     :param subnets: A list of at least two :class:`~boto.vpc.subnet.Subnet`
@@ -294,6 +292,7 @@ def create_database(vpc, subnets, name=None, engine='postgresql', storage=5, app
     # Connect to the Amazon Relational Database Service (Amazon RDS).
     rds_connection = connect_rds()
 
+    # Create a DB Subnet Group.
     db_subnet_group = create_db_subnet_group(subnets)
 
     if not name:
@@ -342,21 +341,36 @@ def create_database(vpc, subnets, name=None, engine='postgresql', storage=5, app
                                     ['OptionGroupName']
 
     if not security_groups:
+        # Connect to the Amazon Virtual Private Cloud (Amazon VPC) service.
+        vpc_connection = connect_vpc()
+
+        # Get VPC from Subnets.
+        vpc_id = set([subnet.vpc_id for subnet in subnets])
+        if not len(vpc_id) == 1:
+            raise RuntimeError('The specified subnets (%s) must be parts of the same network.' % ', '.join([subnet.tags['Name'] for subnet in subnets]))
+        else:
+            vpc_id = next(iter(vpc_id))
+        vpc = vpc_connection.get_all_vpcs(vpc_ids=[vpc_id])[-1]
+
         application_security_group_ids = set()
 
+        # Get ingress Security Group IDs from Instance objects.
         if application_instances:
             # Create rule(s) allowing traffic from application server security group(s).
             application_security_group_ids |= set([group.id for instance in application_instances for group in instance.groups])
 
+        # Get ingress Security Group IDs.
         if application_security_groups:
             # Create rule(s) allowing traffic from application security group(s).
             application_security_group_ids |= set([group.id for group in application_security_groups])
 
+        # Create ingress rules.
         inbound_rules = list()
         for application_security_group_id in application_security_group_ids:
             inbound_rule = ('TCP:' + str(INBOUND_PORT[engine]), application_security_group_id)
             inbound_rules.append(inbound_rule)
 
+        # Create Security Group.
         sg_name = '-'.join(['gp', config['PROJECT_NAME'], config['ENVIRONMENT'], 'db'])
         security_groups = [create_security_group(vpc,
                                                  name=sg_name,
