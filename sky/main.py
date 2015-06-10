@@ -101,8 +101,6 @@ def build_dependency_graph(nodes, level=1):
 
 def build_target(dependency_graph, target='all'):
 
-    logger.info('Buliding target (%s) from dependency graph (%s).', target, dependency_graph)
-
     # Rebuild the dependency graph, if a specific target was specified.
     if target != 'all':
         target_found = False
@@ -155,7 +153,7 @@ def build_target(dependency_graph, target='all'):
                 break
 
     # Build the target node.
-    logger.debug('Buliding (%s).' % dependency_graph)
+    logger.info('Buliding target (%s) from dependency graph (%s).', target, dependency_graph)
     for dependencies in dependency_graph:
         for dependency in dependencies:
             dependency()
