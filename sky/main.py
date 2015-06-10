@@ -100,6 +100,9 @@ def build_dependency_graph(nodes, level=1):
     return graph
 
 def build_target(dependency_graph, target='all'):
+
+    logger.info('Buliding target (%s) from dependency graph (%s).', target, dependency_graph)
+
     # Rebuild the dependency graph, if a specific target was specified.
     if target != 'all':
         target_found = False
@@ -113,6 +116,7 @@ def build_target(dependency_graph, target='all'):
 
             # Search each dependency in the dependency group.
             for dependency in dependencies:
+
                 # Locate the target node.
                 if dependency.__name__ == target:
                     # Truncate the most-recently added dependency group to the target node.
@@ -120,6 +124,7 @@ def build_target(dependency_graph, target='all'):
 
                     # Store the target's dependencies so that they are not pruned.
                     target_dependencies = dependency.dependencies
+                    logger.debug('Target dependencies are (%s).' % target_dependencies)
 
                     # Stop traversing the dependency graph (inner loop) when the target node has been located.
                     target_found = True
@@ -127,9 +132,11 @@ def build_target(dependency_graph, target='all'):
 
             # Stop traversing the dependency graph (outer loop) when the target node has been located.
             if target_found:
+
                 # Traverse through the temporary graph backwards.
+                logger.debug('Pruning (%s).' % temporary_graph)
                 for dependencies in reversed(temporary_graph):
-                    for dependency in dependencies:
+                    for dependency in reversed(dependencies):
 
                         # Prune nodes that are not part of the target's dependency chain.
                         if dependency.__name__ not in target_dependencies and dependency.__name__ != target:
@@ -139,19 +146,22 @@ def build_target(dependency_graph, target='all'):
 
                         # Add indirect dependencies to the target's dependency chain.
                         elif dependency.__name__ in target_dependencies and dependency.dependencies:
-                            logger.debug('Unioning additional dependency/ies (%s).' % dependency.dependencies)
+                            logger.debug('Unioning additional dependency(ies) (%s).' % dependency.dependencies)
                             target_dependencies |= dependency.dependencies
-                            logger.debug('Unioned additional dependency/ies (%s).' % dependency.dependencies)
+                            logger.debug('Unioned additional dependency(ies) (%s).' % dependency.dependencies)
 
                 # Reset the dependency graph.
                 dependency_graph = temporary_graph
                 break
 
     # Build the target node.
+    logger.debug('Buliding (%s).' % dependency_graph)
     for dependencies in dependency_graph:
         for dependency in dependencies:
             dependency()
             ready[dependency.__name__] = dependency
+
+    logger.info('Built target (%s).' % target)
 
 def main():
     parse_arguments()
