@@ -42,6 +42,7 @@ def connect_rds():
     
     return rds
 
+
 def create_db_parameter_group(name=None, engine='postgresql'):
     """
     Create a DB Parameter Group.
@@ -63,9 +64,6 @@ def create_db_parameter_group(name=None, engine='postgresql'):
     # Connect to the Amazon Relational Database Service (Amazon RDS).
     rds_connection = connect_rds()
 
-    # Affected by boto Issue #2677 : https://github.com/boto/boto/issues/2677
-
-
     # Generate Database Parameter Group name.
     if not name:
         name = '-'.join(['pg',
@@ -78,6 +76,7 @@ def create_db_parameter_group(name=None, engine='postgresql'):
     except boto.rds2.exceptions.DBParameterGroupNotFound as error:
         pass
 
+    # Affected by boto Issue #2677 : https://github.com/boto/boto/issues/2677
     db_parameter_group = rds_connection.create_db_parameter_group(name,                                                    # db_parameter_group_name
                                                                   ENGINE[engine],                                          # db_parameter_group_family
                                                                   description=' '.join([config['PROJECT_NAME'], 'Parameter Group'])) # description
@@ -95,6 +94,7 @@ def create_db_parameter_group(name=None, engine='postgresql'):
     logger.debug('Tagged Amazon RDS Resource (%s).' % db_parameter_group_arn)
 
     return db_parameter_group
+
 
 def create_db_subnet_group(subnets, name=None):
     """
@@ -160,6 +160,7 @@ def create_db_subnet_group(subnets, name=None):
 
     return subnet
 
+
 def create_option_group(name=None, engine='postgresql'):
     """
     Create an Option Group.
@@ -221,7 +222,75 @@ def create_option_group(name=None, engine='postgresql'):
 
     return option_group
 
+
 def create_database(vpc, subnets, name=None, engine='postgresql', storage=5, application_instances=None, application_security_groups=None, security_groups=None, publicly_accessible=False, multi_az=False, db_parameter_group=None, option_group=None):
+    """
+    Create Database Instance.
+
+    :type vpc: :class:`boto.vpc.vpc.VPC`
+    :param vpc: The :class:`~boto.vpc.vpc.VPC` that the DB Instance will join.
+
+    :type subnets: list
+    :param subnets: A list of at least two :class:`~boto.vpc.subnet.Subnet`
+        objects that are located in different Availablity Zones (AZs) of the
+        same Region. These :class:`~boto.vpc.subnet.Subnet` objects will be used
+        to create a DB Subnet Group.
+
+        * See also: :func:`sky.database.create_db_subnet_group`
+
+    :type name: str
+    :param name: An *optional* name for the RDS Instance. A name will be
+        generated from the current project name, if one is not specified.
+
+    :type engine: string
+    :param engine: The desired database engine. This is set to ``postgresql``,
+        by default.
+
+        * Supported database engines: ``postgresql``, ``mysql``, and ``oracle``.
+
+    :type storage: int
+    :param storage: The amount of storage (in gigabytes) to be initially
+        allocated for the database instance.
+
+    :type application_instances: list
+    :param application_instances: An *optional* list of EC2
+        :class:`~boto.ec2.instance.Instance` objects that the DB Instance will
+        be permitted to receive traffic from.
+
+    :type application_security_groups: list
+    :param application_security_groups: An *optional* list of
+        :class:`~boto.ec2.securitygroup.SecurityGroup` objects that the DB
+        Instance will be permitted to receive traffic from.
+
+    :type security_groups: :class:`boto.ec2.securitygroup.SecurityGroup`
+    :param security_groups: An *optional* list of
+        :class:`~boto.ec2.securitygroup.SecurityGroup` objects that the DB
+        Instance will join.
+
+    :type publicly_accessible: bool
+    :param publicly_accessible: Whether to alllow devices outside of the VPC
+        hosting the DB Instance to connect to the DB Instance. If True, a Public
+        IP address is allocated for the DB Instance. By default, this is set to
+        ``False`` and a DB Instance is not publicly accessible.
+
+    :type multi_az: bool
+    :param multi_az: Whether to provision and maintain a synchronous standby
+        replica DB Instance in a different Availability Zone (AZ). By default,
+        this is set to ``False`` and a DB Instance will be deployed to a single
+        AZ.
+
+    :type db_parameter_group: :class:`boto.jsonresponse.Element`
+    :param db_parameter_group: An *optional* DB Parameter Group that specifies
+        features and configuration applicable to many database engines.
+
+    :type option_group: :class:`boto.jsonresponse.Element`
+    :param option_group: An *optional* Option Group that specifies
+         features and configuration specific to the chosen database engine.
+
+    :rtype: dict
+    :return: A dictionary containing the elements of the AWS API ``CreateDBInstanceResponse`` response.
+    """
+
     # Connect to the Amazon Relational Database Service (Amazon RDS).
     rds_connection = connect_rds()
 
@@ -271,7 +340,6 @@ def create_database(vpc, subnets, name=None, engine='postgresql', storage=5, app
                                     ['CreateOptionGroupResult']\
                                     ['OptionGroup']\
                                     ['OptionGroupName']
-
 
     if not security_groups:
         application_security_group_ids = set()
