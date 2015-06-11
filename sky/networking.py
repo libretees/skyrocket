@@ -229,6 +229,19 @@ def create_network(name=None, cidr_block=None, network_class=None, internet_conn
     return network
 
 def attach_internet_gateway(vpc):
+    """
+    Attach a Private Network (VPC) to the Internet.
+
+    :type vpc: :class:`boto.vpc.vpc.VPC`
+    :param vpc: The :class:`~boto.vpc.vpc.VPC` that will be connected to the
+        Internet.
+
+        * See also: :func:`sky.networking.create_network`.
+
+    :rtype: bool
+    :return: ``True`` if the :class:`~boto.vpc.vpc.VPC` was successfully
+        connected to the Internet. Otherwise, ``False``.
+    """
     # Defer import to resolve interdependency between .networking and .compute modules.
     from .compute import connect_ec2
 
