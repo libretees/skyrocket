@@ -443,9 +443,9 @@ def create_nat_instance(public_subnet, private_subnet, name=None, security_group
                                                            private_subnet.id, # subnet_id
                                                            dry_run=False)
     if len(association):
-        logger.debug('Subnet (%s) associated to (%s).' % (private_subnet.id, route_table.name))
+        logger.debug('Subnet (%s) associated to (%s).' % (private_subnet.id, route_table.tags['Name']))
     else:
-        logger.error('Subnet (%s) not associated to (%s).' % (private_subnet.id, route_table.name))
+        logger.error('Subnet (%s) not associated to (%s).' % (private_subnet.id, route_table.tags['Name']))
 
     # Clean up unused/orphaned Route Tables.
     route_tables = vpc_connection.get_all_route_tables(filters={'vpc-id': vpc.id,})

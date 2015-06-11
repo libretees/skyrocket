@@ -339,13 +339,12 @@ def create_route_table(vpc, name=None, internet_access=False):
                          config['ENVIRONMENT'], \
                          'public' if internet_access else 'private', \
                          suffix])
-    route_table.name = name
 
     # Tag Route Table.
     tagged = False
     while not tagged:
         try:
-            tagged = ec2_connection.create_tags([route_table.id], {'Name': route_table.name,
+            tagged = ec2_connection.create_tags([route_table.id], {'Name': name,
                                                                    'Project': config['PROJECT_NAME'],
                                                                    'Environment': config['ENVIRONMENT'],
                                                                    'Type': 'public' if internet_access else 'private',})
@@ -355,7 +354,10 @@ def create_route_table(vpc, name=None, internet_access=False):
             else:
                 raise boto.exception.EC2ResponseError(error.status, error.reason)
 
-    logger.info('Created Route Table (%s).' % route_table.name)
+    # Refresh Route Table object.
+    route_table = vpc_connection.get_all_route_tables(route_table_ids=[route_table.id])[-1]
+    logger.info('Created Route Table (%s).' % route_table.tags['Name'])
+
     return route_table
 
 def create_subnets(vpc, zones='All', count=1, byte_aligned=False, balanced=False, public=False):
