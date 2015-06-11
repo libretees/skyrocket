@@ -131,22 +131,24 @@ def build_target(dependency_graph, target='all'):
             # Stop traversing the dependency graph (outer loop) when the target node has been located.
             if target_found:
 
-                # Traverse through the temporary graph backwards.
-                logger.debug('Pruning (%s).' % temporary_graph)
-                for dependencies in reversed(temporary_graph):
-                    for dependency in reversed(dependencies):
+                # Traverse through the temporary graph backwards, if the target is not an independent node.
+                if target_dependencies:
 
-                        # Prune nodes that are not part of the target's dependency chain.
-                        if dependency.__name__ not in target_dependencies and dependency.__name__ != target:
-                            logger.debug('Pruning unneeded node (%s).' % dependency.__name__)
-                            dependencies.remove(dependency)
-                            logger.debug('Pruned unneeded node (%s).' % dependency.__name__)
+                    logger.debug('Pruning (%s).' % temporary_graph)
+                    for dependencies in reversed(temporary_graph):
+                        for dependency in reversed(dependencies):
 
-                        # Add indirect dependencies to the target's dependency chain.
-                        elif dependency.__name__ in target_dependencies and dependency.dependencies:
-                            logger.debug('Unioning additional dependency(ies) (%s).' % dependency.dependencies)
-                            target_dependencies |= dependency.dependencies
-                            logger.debug('Unioned additional dependency(ies) (%s).' % dependency.dependencies)
+                            # Prune nodes that are not part of the target's dependency chain.
+                            if dependency.__name__ not in target_dependencies and dependency.__name__ != target:
+                                logger.debug('Pruning unneeded node (%s).' % dependency.__name__)
+                                dependencies.remove(dependency)
+                                logger.debug('Pruned unneeded node (%s).' % dependency.__name__)
+    
+                            # Add indirect dependencies to the target's dependency chain.
+                            elif dependency.__name__ in target_dependencies and dependency.dependencies:
+                                logger.debug('Unioning additional dependency(ies) (%s).' % dependency.dependencies)
+                                target_dependencies |= dependency.dependencies
+                                logger.debug('Unioned additional dependency(ies) (%s).' % dependency.dependencies)
 
                 # Reset the dependency graph.
                 dependency_graph = temporary_graph
