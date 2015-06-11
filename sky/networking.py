@@ -384,7 +384,44 @@ def create_route_table(vpc, name=None, internet_access=False):
 
     return route_table
 
-def create_subnets(vpc, zones='All', count=1, byte_aligned=False, balanced=False, public=False):
+
+def create_subnets(vpc, zones='all', count=1, byte_aligned=True, balanced=False, public=False):
+    """
+    Create Subnets.
+
+    :type vpc: :class:`boto.vpc.vpc.VPC`
+    :param vpc: The :class:`~boto.vpc.vpc.VPC` that the Subnets belong to.
+
+        * See also: :func:`sky.networking.create_network`.
+
+    :type zones: list
+    :param zones: A list of strings indicating which Availability Zone(s) (AZs)
+        to create Subnets in. By default, this is set to all AZs in the Region.
+
+    :type count: int
+    :param count: The number of Subnets to create in each Availability Zone
+        (AZ). By default, this is set to 1.
+
+    :type byte_aligned: bool
+    :param byte_aligned: Specifies whether or not to align the Subnet network
+        address to the nearest byte. This results in cleaner Private IP
+        addresses, where Subnets will be designated IPs, e.g., 10.0.1.0,
+        10.0.2.0, ... 10.0.n.0. By default, Subnets will be byte-aligned.
+
+    :type balanced: bool
+    :param balanced: Specifies whether or not to balance a Subnet capacity with
+        the network's expandability. If, for example, ``byte_aligned`` is False
+        and ``balanced`` is also False, a single list of
+        :class:`~boto.vpc.subnet.Subnet` objects will be created, each with the
+        maximum possible network capacity. If ``balanced`` is True, in this
+        case, a the maximum threshold of Subnets and their network capacity is
+        equal. By default, this is set to ``False`` and Subnets will be created
+        to maximize their network capacity.
+
+    :rtype: list
+    :return: A list of :class:`~boto.vpc.subnet.Subnet` objects.
+    """
+
     # Defer import to resolve interdependency between .networking and .compute modules.
     from .compute import connect_ec2
     
