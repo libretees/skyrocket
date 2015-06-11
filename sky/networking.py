@@ -271,7 +271,7 @@ def attach_internet_gateway(vpc):
     # Get name of VPC.
     vpc_tags = ec2_connection.get_all_tags(filters={'resource-id': vpc.id,
                                                     'resource-type': 'vpc'})
-    vpc_name = [tag.value for tag in vpc_tags if tag.name == 'Name'][0]
+    vpc_name = next(tag.value for tag in vpc_tags if tag.name == 'Name')
 
     # Attach Internet Gateway to Virtual Private Cloud (VPC).
     logger.info('Attaching Internet Gateway (%s) to VPC (%s).' % (internet_gateway_name, vpc_name))
@@ -541,7 +541,7 @@ def get_network_capacity(netmask):
     # Calculate the number of available IP addresses on a given network.
     available_ips = (0xffffffff ^ (0xffffffff << 32-int(netmask) & 0xffffffff))-4 # 4 addresses are reserved by Amazon
                                                                                   # for IP networking purposes.
-                                                                                  # .0 for the network, .1 for the gateway,
+                                                                                  # .1 for the gateway, .2 for DNS,
                                                                                   # .3 for DHCP services, and .255 for broadcast.
     return available_ips
 
@@ -552,9 +552,10 @@ def get_default_vpc():
     # Get all Virtual Private Clouds (VPCs).
     vpcs = vpc_connection.get_all_vpcs()
 
-    # Return default VPC.
-    default_vpc = [vpc for vpc in vpcs if vpc.is_default]
-    return default_vpc[0] if len(default_vpc) else None
+    # Get the default VPC, if one exists.
+    default_vpc = next([vpc for vpc in vpcs if vpc.is_default], None)
+
+    return default_vpc
 
 def get_cidr_block_components(cidr_block):
     # Break CIDR block into IP and Netmask components.
