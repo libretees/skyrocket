@@ -10,6 +10,9 @@ from .state import config, mode
 logger = logging.getLogger(__name__)
 
 def connect_vpc():
+    """
+    Connect to the Amazon Virtual Private Cloud (Amazon VPC) service.
+    """
     logger.debug('Connecting to the Amazon Virtual Private Cloud (Amazon VPC) service.')
     vpc = boto.connect_vpc(aws_access_key_id=config['AWS_ACCESS_KEY_ID'],
                            aws_secret_access_key=config['AWS_SECRET_ACCESS_KEY'])
