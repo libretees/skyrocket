@@ -67,6 +67,37 @@ def validate_cidr_block(cidr_block):
         return False
 
 def create_network(name=None, cidr_block=None, network_class=None, internet_connected=False):
+    """
+    Create a Private Network (VPC).
+
+    :type name: str
+    :param name: An *optional* name for the Virtual Private Cloud (VPC). A name
+        will be generated from the current project name, if one is not
+        specified.
+
+    :type cidr_block: string
+    :param cidr_block: A CIDR block defining a Class A, Class B, or Class C
+        Private Network. Note that only one of the ``cidr_block`` and
+        ``network_class`` parameters should receive arguments. If both are
+        specified, ``cidr_block`` takes precedence.
+
+    :type network_class: string
+    :param network_class: A string, indicating a Class A, Class B, or Class C
+        Private Network. Note that only one of the ``cidr_block`` and
+        ``network_class`` parameters should receive arguments. If both are
+        specified, ``cidr_block`` takes precedence.
+
+        * Valid values: ``A`` defines a ``10.0.0.0/16`` CIDR block, ``B`` defines a ``172.16.0.0/16`` CIDR block, and ``C`` defines a ``192.168.0.0/16`` CIDR block.
+
+    :type internet_connected: bool
+    :param internet_connected: Specifies whether the Virtual Private Cloud
+        (VPC) Instance will be connected to the Internet via an attached
+        Internet Gateway. If set to ``True``, the VPC will be connected to the
+        Internet. By default, a VPC is *not* connected to the Internet.
+
+    :rtype: :class:`boto.vpc.vpc.VPC`
+    :return: The created :class:`~boto.vpc.vpc.VPC` network.
+    """
     # Defer import to resolve interdependency between .networking and .compute modules.
     from .compute import connect_ec2
 
