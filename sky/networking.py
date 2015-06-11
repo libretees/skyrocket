@@ -21,6 +21,16 @@ def connect_vpc():
     return vpc
 
 def validate_cidr_block(cidr_block):
+    """
+    Validate that a CIDR block is in the correct format and applicable to VPC networking.
+
+    :type cidr_block: string
+    :param cidr_block: A CIDR block defining a Class A, Class B, or Class C
+        Private Network.
+
+    :rtype: bool
+    :return: ``True``, if ``cidr block`` formatted correctly for use with VPC networking. Otherwise, ``False``.
+    """
     try:
         logger.debug('Validating CIDR block (%s).' % cidr_block)
 
