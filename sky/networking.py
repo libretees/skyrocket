@@ -20,6 +20,7 @@ def connect_vpc():
 
     return vpc
 
+
 def validate_cidr_block(cidr_block):
     """
     Validate that a CIDR block is in the correct format and applicable to VPC networking.
@@ -65,6 +66,7 @@ def validate_cidr_block(cidr_block):
     except AssertionError as error:
         logger.error('Invalid CIDR block given (%s).' % cidr_block)
         return False
+
 
 def create_network(name=None, cidr_block=None, network_class=None, internet_connected=False):
     """
@@ -228,6 +230,7 @@ def create_network(name=None, cidr_block=None, network_class=None, internet_conn
 
     return network
 
+
 def attach_internet_gateway(vpc):
     """
     Attach a Private Network (VPC) to the Internet.
@@ -285,7 +288,28 @@ def attach_internet_gateway(vpc):
 
     return True if attached else False
 
+
 def create_route_table(vpc, name=None, internet_access=False):
+    """
+    Create a Route Table.
+
+    :type vpc: :class:`boto.vpc.vpc.VPC`
+    :param vpc: The :class:`~boto.vpc.vpc.VPC` that the Route Table belongs to.
+
+        * See also: :func:`sky.networking.create_network`.
+
+    :type name: str
+    :param name: An *optional* name for the Route Table. A name will be
+        generated from the current project name, if one is not specified.
+
+    :type internet_access: bool
+    :param internet_access: Specifies whether the Route Table will contain a
+        route to the Internet (0.0.0.0/0, in CIDR notation).
+
+    :rtype: :class:`boto.vpc.routetable.RouteTable`
+    :return: The created :class:`~boto.vpc.routetable.RouteTable` object.
+    """
+
     # Defer import to resolve interdependency between .networking and .compute modules.
     from .compute import connect_ec2
     
