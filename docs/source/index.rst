@@ -22,8 +22,14 @@ Contents:
 .. automodule:: sky.compute
    :members:
 
+:mod:`sky.database` -- Amazon RDS Services
+------------------------------------------
+
 .. automodule:: sky.database
    :members:
+
+:mod:`sky.networking` -- Amazon VPC Services
+--------------------------------------------
 
 .. automodule:: sky.networking
    :members:
