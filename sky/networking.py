@@ -66,7 +66,7 @@ def validate_cidr_block(cidr_block):
         logger.error('Invalid CIDR block given (%s).' % cidr_block)
         return False
 
-def create_network(name=None, internet_connected=False, **kwargs):
+def create_network(name=None, cidr_block=None, network_class=None, internet_connected=False):
     # Defer import to resolve interdependency between .networking and .compute modules.
     from .compute import connect_ec2
 
@@ -87,16 +87,14 @@ def create_network(name=None, internet_connected=False, **kwargs):
             logger.info('Found existing Network (%s).' % name)
             return existing_vpc[-1]
 
-    if 'cidr_block' in kwargs:
-        cidr_block = kwargs['cidr_block']
-    elif 'network_class' in kwargs:
-        network_class = kwargs['network_class']
+    # Provide a default CIDR block, if a network class was specified.
+    if not cidr_block and network_class:
         cidr_block = '10.0.0.0/16' if network_class.upper() == 'A' \
                 else '172.16.0.0/16' if network_class.upper() == 'B' \
                 else '192.168.0.0/16' if network_class.upper() == 'C' \
                 else '0.0.0.0/0'
     else:
-        raise TypeError( "Value for cidr_block or network_class arguments must be specified." )
+        raise TypeError("Value for cidr_block or network_class arguments must be specified.")
         
     if not validate_cidr_block(cidr_block):
         sys.exit(1)
