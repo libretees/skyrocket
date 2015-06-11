@@ -95,6 +95,8 @@ def create_network(name=None, cidr_block=None, network_class=None, internet_conn
         Internet Gateway. If set to ``True``, the VPC will be connected to the
         Internet. By default, a VPC is *not* connected to the Internet.
 
+        * See also: :func:`sky.networking.attach_internet_gateway`.
+
     :rtype: :class:`boto.vpc.vpc.VPC`
     :return: The created :class:`~boto.vpc.vpc.VPC` network.
     """
@@ -268,7 +270,7 @@ def attach_internet_gateway(vpc):
     else:
         logger.error('Could not attach Internet Gateway (%s).' % internet_gateway_name)
 
-    return internet_gateway
+    return True if attached else False
 
 def create_route_table(vpc, name=None, internet_access=False):
     # Defer import to resolve interdependency between .networking and .compute modules.
