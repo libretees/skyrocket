@@ -294,7 +294,8 @@ def create_route_table(vpc, name=None, internet_access=False):
     Create a Route Table.
 
     :type vpc: :class:`boto.vpc.vpc.VPC`
-    :param vpc: The :class:`~boto.vpc.vpc.VPC` that the Route Table belongs to.
+    :param vpc: The :class:`~boto.vpc.vpc.VPC` that the Route Table will belong
+        to.
 
         * See also: :func:`sky.networking.create_network`.
 
@@ -390,7 +391,7 @@ def create_subnets(vpc, zones='all', count=1, byte_aligned=True, balanced=False,
     Create Subnets.
 
     :type vpc: :class:`boto.vpc.vpc.VPC`
-    :param vpc: The :class:`~boto.vpc.vpc.VPC` that the Subnets belong to.
+    :param vpc: The :class:`~boto.vpc.vpc.VPC` that the Subnets will belong to.
 
         * See also: :func:`sky.networking.create_network`.
 
@@ -528,7 +529,38 @@ def create_subnets(vpc, zones='all', count=1, byte_aligned=True, balanced=False,
 
     return subnets
 
+
 def create_subnet(vpc, zone, cidr_block, subnet_name=None, route_table=None):
+    """
+    Create a Subnet.
+
+    :type vpc: :class:`boto.vpc.vpc.VPC`
+    :param vpc: The :class:`~boto.vpc.vpc.VPC` that the Subnet will belong to.
+
+        * See also: :func:`sky.networking.create_network`.
+
+    :type zone: :class:`boto.ec2.zone.Zone`
+    :param zone: A :class:`~boto.ec2.zone.Zone` object indicating which
+        Availability Zone (AZ) to create the Subnet in. By default, this
+        is set to the first result returned from
+        :func:`boto.ec2.connection.get_all_zones`.
+
+    :type cidr_block: string
+    :param cidr_block: A CIDR block defining a Class A, Class B, or Class C
+        Private Network.
+
+    :type name: str
+    :param name: An *optional* name for the Subnet. A name will be generated
+        from the current project name, if one is not specified.
+
+    :type route_table: :class:`boto.vpc.routetable.RouteTable`
+    :param route_table: An *optional* :class:`~boto.vpc.routetable.RouteTable`
+        that will be associated to the Subnet.
+
+    :rtype: :class:`boto.vpc.subnet.Subnet`
+    :return: The created :class:`~boto.vpc.subnet.Subnet`.
+    """
+
     # Defer import to resolve interdependency between .networking and .compute modules.
     from .compute import connect_ec2
     
