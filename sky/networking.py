@@ -650,6 +650,13 @@ def get_network_capacity(netmask):
 
 
 def get_default_vpc():
+    """
+    Get the Default VPC in the Region, if one exists. This is a special VPC that behaves like EC2-Classic.
+
+    :rtype: :class:`boto.vpc.vpc.VPC`
+    :return: The Default VPC.
+    """
+
     # Connect to the Amazon Virtual Private Cloud (Amazon VPC) service.
     vpc_connection = connect_vpc()
 
