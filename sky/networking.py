@@ -541,9 +541,9 @@ def create_subnet(vpc, zone, cidr_block, subnet_name=None, route_table=None):
 
     :type zone: :class:`boto.ec2.zone.Zone`
     :param zone: A :class:`~boto.ec2.zone.Zone` object indicating which
-        Availability Zone (AZ) to create the Subnet in. By default, this
-        is set to the first result returned from
-        :func:`boto.ec2.connection.get_all_zones`.
+        Availability Zone (AZ) to create the Subnet in.
+
+        * See also: :func:`boto.ec2.connection.get_all_zones`.
 
     :type cidr_block: string
     :param cidr_block: A CIDR block defining a Class A, Class B, or Class C
