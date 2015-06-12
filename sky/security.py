@@ -146,6 +146,39 @@ def create_role(inline_policies):
     return role
 
 def upload_ssl_certificate(public_key, private_key, certificate_chain=None, name=None):
+    """
+    Uploads a SSL Certificate to the Amazon IAM service and provides its Amazon Resource Name (ARN).
+
+    :type public_key: str
+    :param public_key: The path to a PEM-encoded public key certificate file.
+        This file will have one ``-----BEGIN CERTIFICATE-----`` heading and one
+        ``-----END CERTIFICATE-----`` heading.
+
+        * **Warning: Do not put this file into version control.**
+
+    :type private_key: str
+    :param private_key: The path to a PEM-encoded private key file. This file
+        will have one ``-----BEGIN RSA PRIVATE KEY-----`` heading and one
+        ``-----END RSA PRIVATE KEY-----`` heading.
+
+        * **Warning: Do not put this file into version control.**
+
+    :type certificate_chain: str
+    :param certificate_chain: An *optional* path to a PEM-encoded certificate
+        chain file. This file will likely have several
+        ``-----BEGIN CERTIFICATE-----`` and ``-----END CERTIFICATE-----``
+        headings.
+
+        * **Warning: Do not put this file into version control.**
+
+    :type key_name: str
+    :param key_name: An *optional* name for the SSL Certificate. A name will be
+        generated from the current project name, if one is not specified.
+
+    :rtype: str
+    :return: The Amazon Resource Name (ARN) of the uploaded SSL Certificate.
+    """
+
     # Connect to the Amazon Identity and Access Management (Amazon IAM) service.
     iam_connection = connect_iam()
 
