@@ -630,13 +630,24 @@ def create_subnet(vpc, zone, cidr_block, subnet_name=None, route_table=None):
 
     return subnet
 
+
 def get_network_capacity(netmask):
+    """
+    Get a network capacity, i.e., the maximum number of hosts on a given
+        network.
+
+    :type netmask: string
+    :param netmask: The netmask of a given network, ranging 0-32 inclusively.
+
+    :rtype: int
+    :return: The network's capacity.
+    """
+
     # Calculate the number of available IP addresses on a given network.
-    available_ips = (0xffffffff ^ (0xffffffff << 32-int(netmask) & 0xffffffff))-4 # 4 addresses are reserved by Amazon
-                                                                                  # for IP networking purposes.
-                                                                                  # .1 for the gateway, .2 for DNS,
-                                                                                  # .3 for DHCP services, and .255 for broadcast.
+    available_ips = (0xffffffff ^ (0xffffffff << 32-int(netmask) & 0xffffffff))-4 # 4 addresses are reserved by Amazon for IP networking purposes.
+                                                                                  # .1 for the gateway, .2 for DNS, .3 for DHCP services, and .255 for broadcast.
     return available_ips
+
 
 def get_default_vpc():
     # Connect to the Amazon Virtual Private Cloud (Amazon VPC) service.
