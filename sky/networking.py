@@ -633,8 +633,7 @@ def create_subnet(vpc, zone, cidr_block, subnet_name=None, route_table=None):
 
 def get_network_capacity(netmask):
     """
-    Get a network capacity, i.e., the maximum number of hosts on a given
-        network.
+    Get a network capacity, i.e., the maximum number of hosts on a given network.
 
     :type netmask: string
     :param netmask: The netmask of a given network, ranging 0-32 inclusively.
@@ -668,7 +667,15 @@ def get_default_vpc():
 
     return default_vpc
 
+
 def get_cidr_block_components(cidr_block):
+    """
+    Break CIDR block into IP and Netmask components.
+
+    :rtype: tuple
+    :return: A tuple in the format: (``network_ip``, ``netmask``).
+    """
+
     # Break CIDR block into IP and Netmask components.
     network_ip, netmask = itemgetter(0, 1)(cidr_block.split('/'))
     network_ip = int(ipaddress.IPv4Address(network_ip))
