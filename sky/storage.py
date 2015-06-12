@@ -7,6 +7,10 @@ from .state import config
 logger = logging.getLogger(__name__)
 
 def connect_s3():
+    """
+    Connect to the Amazon Simple Storage Service (Amazon S3).
+    """
+
     logger.debug('Connecting to the Amazon Simple Storage Service (Amazon S3).')
     s3 = boto.connect_s3(aws_access_key_id=config['AWS_ACCESS_KEY_ID'],
                          aws_secret_access_key=config['AWS_SECRET_ACCESS_KEY'])

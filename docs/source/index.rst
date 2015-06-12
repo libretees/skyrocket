@@ -35,9 +35,15 @@ Contents:
    :members:
 
 :mod:`sky.security` -- Amazon IAM Services
---------------------------------------------
+------------------------------------------
 
 .. automodule:: sky.security
+   :members:
+
+:mod:`sky.storage` -- Amazon S3 Services
+----------------------------------------
+
+.. automodule:: sky.storage
    :members:
 
 Indices and tables
