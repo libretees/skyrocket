@@ -21,7 +21,7 @@ def connect_iam():
 
 def delete_role(role_name):
     """
-    Deletes the specified Role. Will remove and delete any Instance Profiles or Role Policies associated to the Role.
+    Deletes the specified Role. Will remove and delete any Role Policies and Instance Profiles associated to the Role.
 
     :type role_name: string
     :param role_name: The name of the role to delete.
@@ -102,6 +102,17 @@ def delete_role(role_name):
             logger.error('Error %s: %s. Role (%s) was not found. ' % (error.status, error.reason, role_name))
 
 def create_role(inline_policies):
+    """
+    Creates a Role, along with an associated Role Policy and Instance Profile.
+
+    :type inline_policies: list
+    :param inline_policies: A list of JSON-formatted IAM Policies (strings),
+        defining actions that are permitted as a member of this role.
+
+    :rtype: :class:`boto.jsonresponse.Element`
+    :return: The created Role.
+    """
+
     # Connect to the Amazon Identity and Access Management (Amazon IAM) service.
     iam_connection = connect_iam()
 
@@ -113,7 +124,10 @@ def create_role(inline_policies):
     role_name = '-'.join(['role', config['PROJECT_NAME'], config['ENVIRONMENT']])
     delete_role(role_name)
     logger.info('Creating Role (%s).' % role_name)
-    role = iam_connection.create_role(role_name)
+    response = iam_connection.create_role(role_name)
+    role = response['create_role_response']\
+                   ['create_role_result']\
+                   ['role']
     logger.info('Created Role (%s).' % role_name)
 
     # Set up Instance Profile.
@@ -131,7 +145,8 @@ def create_role(inline_policies):
 
     # Allow time for Role to register with Amazon IAM service.
     time.sleep(5) # Required 5-second sleep.
-    return instance_profile
+
+    return role
 
 def upload_ssl_certificate(public_key, private_key, certificate_chain=None, name=None):
     # Connect to the Amazon Identity and Access Management (Amazon IAM) service.
