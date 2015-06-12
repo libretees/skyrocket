@@ -479,7 +479,7 @@ def create_subnets(vpc, zones='all', count=1, byte_aligned=True, balanced=False,
         subnet_netmask = subnet_netmask+8-(subnet_netmask%8) if subnet_netmask < 24 else subnet_netmask
 
     # Create Route Table for Public/Private Subnets.
-    route_table = create_route_table(vpc, internet_access=True) if public else create_route_table(vpc, internet_access=False)
+    route_table = create_route_table(vpc, internet_access=(True if public else False))
 
     # Create Subnets.
     subnets = list()
