@@ -36,6 +36,7 @@ def connect_rds():
     """
     Connect to the Amazon Relational Database Service (Amazon RDS) service.
     """
+
     logger.debug('Connecting to the Amazon Relational Database Service (Amazon RDS).')
     rds = boto.connect_rds2(aws_access_key_id=config['AWS_ACCESS_KEY_ID'],
                             aws_secret_access_key=config['AWS_SECRET_ACCESS_KEY'])

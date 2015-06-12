@@ -7,6 +7,10 @@ from .state import config, mode
 logger = logging.getLogger(__name__)
 
 def connect_iam():
+    """
+    Connect to the Amazon Identity and Access Management (Amazon IAM) service.
+    """
+
     logger.debug('Connecting to the Amazon Identity and Access Management (Amazon IAM) service.')
     iam = boto.connect_iam(aws_access_key_id=config['AWS_ACCESS_KEY_ID'],
                            aws_secret_access_key=config['AWS_SECRET_ACCESS_KEY'])

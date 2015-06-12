@@ -34,6 +34,12 @@ Contents:
 .. automodule:: sky.networking
    :members:
 
+:mod:`sky.security` -- Amazon IAM Services
+--------------------------------------------
+
+.. automodule:: sky.security
+   :members:
+
 Indices and tables
 ==================
 
