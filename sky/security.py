@@ -18,7 +18,15 @@ def connect_iam():
 
     return iam
 
+
 def delete_role(role_name):
+    """
+    Deletes the specified Role. Will remove and delete any Instance Profiles or Role Policies associated to the Role.
+
+    :type role_name: string
+    :param role_name: The name of the role to delete.
+    """
+
     # Connect to the Amazon Identity and Access Management (Amazon IAM) service.
     iam_connection = connect_iam()
 
