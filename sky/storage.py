@@ -19,6 +19,12 @@ def connect_s3():
     return s3
 
 def create_bucket():
+    """
+    Create an S3 bucket for static file storage.
+
+    :rtype: :class:`boto.s3.bucket.Bucket`
+    :return: An S3 Bucket.
+    """
     s3_connection = connect_s3()
     s3_bucket_name = '-'.join(['s3', config['PROJECT_NAME'], config['ENVIRONMENT'], '%x' % random.randrange(2**32)])
     lifecycle_config = boto.s3.lifecycle.Lifecycle()
