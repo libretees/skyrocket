@@ -9,6 +9,9 @@ logger = logging.getLogger(__name__)
 def connect_s3():
     """
     Connect to the Amazon Simple Storage Service (Amazon S3).
+
+    :rtype: :class:`boto.iam.connection.IAMConnection`
+    :return: An :class:`~boto.iam.connection.IAMConnection` object.
     """
 
     logger.debug('Connecting to the Amazon Simple Storage Service (Amazon S3).')

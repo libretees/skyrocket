@@ -12,6 +12,9 @@ logger = logging.getLogger(__name__)
 def connect_vpc():
     """
     Connect to the Amazon Virtual Private Cloud (Amazon VPC) service.
+
+    :rtype: :class:`boto.vpc.VPCConnection`
+    :return: A :class:`~boto.vpc.VPCConnection` object.
     """
 
     logger.debug('Connecting to the Amazon Virtual Private Cloud (Amazon VPC) service.')

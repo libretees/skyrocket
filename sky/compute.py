@@ -12,6 +12,9 @@ logger = logging.getLogger(__name__)
 def connect_ec2():
     """
     Connect to the Amazon Elastic Compute Cloud (Amazon EC2) service.
+
+    :rtype: :class:`boto.ec2.connection.EC2Connection`
+    :return: An :class:`~boto.ec2.connection.EC2Connection` object.
     """
 
     logger.debug('Connecting to the Amazon Elastic Compute Cloud (Amazon EC2) service.')

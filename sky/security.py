@@ -9,6 +9,9 @@ logger = logging.getLogger(__name__)
 def connect_iam():
     """
     Connect to the Amazon Identity and Access Management (Amazon IAM) service.
+
+    :rtype: :class:`boto.s3.connection.S3Connection`
+    :return: An :class:`~boto.s3.connection.S3Connection` object.
     """
 
     logger.debug('Connecting to the Amazon Identity and Access Management (Amazon IAM) service.')

@@ -35,6 +35,9 @@ INBOUND_PORT = {
 def connect_rds():
     """
     Connect to the Amazon Relational Database Service (Amazon RDS) service.
+
+    :rtype: :class:`boto.rds.RDSConnection`
+    :return: An :class:`~boto.rds.RDSConnection` object.
     """
 
     logger.debug('Connecting to the Amazon Relational Database Service (Amazon RDS).')
