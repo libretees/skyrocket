@@ -21,6 +21,7 @@ def connect_s3():
 
     return s3
 
+
 def create_bucket():
     """
     Create an S3 bucket for static file storage.
@@ -46,9 +47,21 @@ def create_bucket():
 
     return bucket
 
+
 def add_object(bucket, obj):
+    """
+    Upload a local file to an S3 bucket.
+
+    :type bucket: :class:`boto.s3.bucket.Bucket`
+    :param bucket: The :class:`~boto.s3.bucket.Bucket` that the file will be uploaded to.
+
+    :type obj: string
+    :param obj: The local filename.
+    """
+
     key = bucket.new_key(obj)
     key.set_contents_from_filename(obj, policy='private')
+
 
 def get_bucket_policy(bucket):
     arns = ['"arn:aws:s3:::'+bucket.name+'/'+key.name+'"' for key in bucket.get_all_keys()]
