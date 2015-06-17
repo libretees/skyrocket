@@ -13,12 +13,30 @@ from .state import config
 logger = logging.getLogger(__name__)
 
 def get_script(region, s3bucket, s3object, filename='user-data.sh'):
+    """
+    Gets a User-Data script that instructs an EC2 instance to copy an object from an S3 Bucket and run a command afterwards.
+
+    :type region: str
+    :param region: The region that the :class:`~boto.s3.bucket.Bucket` is located in.
+
+        * Note: If the S3 Bucket is located in the ``boto.s3.connection.Location.DEFAULT`` (US Standard) S3 region, specify ``us-east-1``.
+
+    :type bucket: :class:`boto.s3.bucket.Bucket`
+    :param bucket: The :class:`~boto.s3.bucket.Bucket` to copy the object from.
+
+    :type s3object: str
+    :param s3object: The name of the object to download.
+
+    :type filename: str
+    :param filename: The path to a template user-data script.
+    """
     template = open(filename).read()
     return Template(template).substitute(
         region=region,
         s3bucket=s3bucket,
         s3object=s3object
     )
+
 
 def get_closest_region(service='ec2', repetitions=1):
     regions = [region.name for region in regioninfo.get_regions(service) if 'gov' not in region.name and 'cn' not in region.name]

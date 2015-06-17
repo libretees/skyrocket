@@ -46,6 +46,12 @@ Contents:
 .. automodule:: sky.storage
    :members:
 
+:mod:`sky.utils` -- Sky Utility Functions
+-----------------------------------------
+
+.. automodule:: sky.utils
+   :members:
+
 Indices and tables
 ==================
 
