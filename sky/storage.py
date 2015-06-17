@@ -64,6 +64,16 @@ def add_object(bucket, obj):
 
 
 def get_bucket_policy(bucket):
+    """
+    Get an IAM Policy that will permit EC2 Instances to copy files from an S3 Bucket.
+
+    :type bucket: :class:`boto.s3.bucket.Bucket`
+    :param bucket: The :class:`~boto.s3.bucket.Bucket` that the IAM Policy will be generated for.
+
+    :type obj: string
+    :param obj: The JSON-formatted IAM Policy.
+    """
+
     arns = ['"arn:aws:s3:::'+bucket.name+'/'+key.name+'"' for key in bucket.get_all_keys()]
     policy = """{
         "Version": "2012-10-17",
@@ -75,4 +85,5 @@ def get_bucket_policy(bucket):
             "Resource": [%s]
         }]
     }""" % ','.join(arns)
+
     return policy
