@@ -80,7 +80,7 @@ def make_tarfile(output_filename, source_dir):
 
 def configure_logger(args):
     """
-    Configure the application/package logger.
+    Configure the application/package logger. (This is used internally.)
 
     """
 
@@ -95,6 +95,11 @@ def configure_logger(args):
 
 
 def parse_arguments():
+    """
+    Parse command line arguments. (This is used internally.)
+
+    """
+
     global config
     
     valid_arguments = True
