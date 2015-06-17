@@ -79,6 +79,11 @@ def make_tarfile(output_filename, source_dir):
 
 
 def configure_logger(args):
+    """
+    Configure the application/package logger.
+
+    """
+
     # Restrict the boto logger to the WARNING log level.
     if args.loglevel.upper() in ['DEBUG', 'INFO', 'WARNING']:
         logging.getLogger('boto').setLevel(logging.WARNING)
