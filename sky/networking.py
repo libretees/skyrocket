@@ -120,11 +120,15 @@ def create_network(name=None, cidr_block=None, network_class=None, internet_conn
         name = '-'.join(['vpc', config['PROJECT_NAME'], config['ENVIRONMENT']])
 
     # Check for existing network.
-    if config['CREATION_MODE'] == mode.PERMANENT:
+    if config['CREATION_MODE'] in [mode.PERMANENT, mode.EPHEMERAL]:
         existing_vpc = vpc_connection.get_all_vpcs(filters={'tag:Name': name})
         if len(existing_vpc):
             logger.info('Found existing Network (%s).' % name)
-            return existing_vpc[-1]
+            existing_vpc = existing_vpc[-1]
+            if config['CREATION_MODE'] == mode.EPHEMERAL:
+                delete_network(existing_vpc)
+            else:
+                return existing_vpc
 
     # Provide a default CIDR block, if a network class was specified.
     if not cidr_block and network_class:
@@ -235,6 +239,60 @@ def create_network(name=None, cidr_block=None, network_class=None, internet_conn
     return network
 
 
+def delete_network(vpc):
+    """
+    Delete an existing network.
+
+    :type vpc: :class:`boto.vpc.vpc.VPC`
+    :param vpc: The :class:`~boto.vpc.vpc.VPC` that will be deleted.
+
+        * See also: :func:`sky.networking.create_network`.
+
+    :rtype: bool
+    :return: ``True`` if the :class:`~boto.vpc.vpc.VPC` was successfully
+        deleted. Otherwise, ``False``.
+    """
+    # Defer import to resolve interdependency between .networking and .compute modules.
+    from .compute import connect_ec2
+
+    # Connect to the Amazon Virtual Private Cloud (Amazon VPC) service.
+    vpc_connection = connect_vpc()
+
+    # Connect to the Amazon Elastic Compute Cloud (Amazon EC2) service.
+    ec2_connection = connect_ec2()
+
+    # Get name of VPC.
+    vpc_tags = ec2_connection.get_all_tags(filters={'resource-id': vpc.id,
+                                                    'resource-type': 'vpc'})
+    vpc_name = next(tag.value for tag in vpc_tags if tag.name == 'Name')
+
+    # Delete any existing Subnets.
+    existing_subnets = vpc_connection.get_all_subnets(filters={'vpc-id': vpc.id})
+    if existing_subnets:
+        # Convert boto.resultset.ResultSet to a list of Subnet objects.
+        existing_subnets = [subnet for subnet in existing_subnets]
+        delete_subnets(existing_subnets)
+
+    # Delete any existing Internet Gateways.
+    internet_gateways = vpc_connection.get_all_internet_gateways(filters={'attachment.vpc-id': vpc.id,})
+    if internet_gateways:
+        delete_internet_gateways(internet_gateways)
+
+    # Delete any existing Route Tables.
+    route_tables = vpc_connection.get_all_route_tables(filters={'vpc-id': vpc.id,})
+    if route_tables:
+        delete_route_tables(route_tables)
+
+    logger.info('Deleting Network (%s).' % vpc_name)
+    vpc = vpc if not vpc_connection.delete_vpc(vpc.id) else None
+    if not vpc:
+        logger.info('Deleted Network (%s).' % vpc_name)
+    else:
+        logger.info('Could not delete Network (%s).' % vpc_name)
+
+    return True if not vpc else False
+
+
 def attach_internet_gateway(vpc):
     """
     Attach a Private Network (VPC) to the Internet.
@@ -249,6 +307,7 @@ def attach_internet_gateway(vpc):
     :return: ``True`` if the :class:`~boto.vpc.vpc.VPC` was successfully
         connected to the Internet. Otherwise, ``False``.
     """
+
     # Defer import to resolve interdependency between .networking and .compute modules.
     from .compute import connect_ec2
 
@@ -291,6 +350,46 @@ def attach_internet_gateway(vpc):
         logger.error('Could not attach Internet Gateway (%s).' % internet_gateway_name)
 
     return True if attached else False
+
+
+def delete_internet_gateways(internet_gateways):
+    """
+    Delete existing Route Tables.
+
+    :type vpc: list
+    :param vpc: A list of :class:`~boto.vpc.internetgateway.InternetGateway`
+        objects that will be deleted.
+
+        * See also: :func:`sky.networking.attach_internet_gateway`.
+
+    :rtype: bool
+    :return: ``True`` if the :class:`~boto.vpc.internetgateway.InternetGateway`
+        objects were successfully deleted. Otherwise, ``False``.
+    """
+
+    # Connect to the Amazon Virtual Private Cloud (Amazon VPC) service.
+    vpc_connection = connect_vpc()
+
+    results = list()
+    for internet_gateway in internet_gateways:
+        internet_gateway_name = internet_gateway.tags['Name']
+        vpc_id = next(attachment.vpc_id for attachment in internet_gateway.attachments)
+
+        logger.info('Deleting Internet Gateway (%s).' % internet_gateway_name)
+        removed = vpc_connection.detach_internet_gateway(internet_gateway.id, vpc_id)
+
+        deleted = False
+        if removed:
+            deleted = vpc_connection.delete_internet_gateway(internet_gateway.id)
+
+        if deleted:
+            logger.info('Deleted Internet Gateway (%s).' % internet_gateway_name)
+        else:
+            logger.info('Could not delete Internet Gateway (%s).' % internet_gateway_name)
+
+        results.append(deleted)
+
+    return True if not False in results else False
 
 
 def create_route_table(vpc, name=None, internet_access=False):
@@ -388,6 +487,44 @@ def create_route_table(vpc, name=None, internet_access=False):
     logger.info('Created Route Table (%s).' % route_table.tags['Name'])
 
     return route_table
+
+
+def delete_route_tables(route_tables):
+    """
+    Delete existing Route Tables.
+
+    :type vpc: list
+    :param vpc: A list of :class:`~boto.vpc.routetable.RouteTable` objects that
+        will be deleted.
+
+        * See also: :func:`sky.networking.create_route_table`.
+
+    :rtype: bool
+    :return: ``True`` if the :class:`~boto.vpc.routetable.RouteTable` objects
+        were successfully deleted. Otherwise, ``False``.
+    """
+
+    # Connect to the Amazon Virtual Private Cloud (Amazon VPC) service.
+    vpc_connection = connect_vpc()
+
+    results = list()
+    for route_table in route_tables:
+        route_table_name = route_table.tags['Name']
+
+        main_route_table = vpc_connection.get_all_route_tables(route_table_ids=[route_table.id],
+                                                               filters={'association.main': 'true',}) # Affected by boto Issue #1742 : https://github.com/boto/boto/issues/1742
+
+        if not main_route_table:
+            logger.info('Deleting Route Table (%s).' % route_table_name)
+            deleted = vpc_connection.delete_route_table(route_table.id)
+            if deleted:
+                logger.info('Deleted Route Table (%s).' % route_table_name)
+            else:
+                logger.info('Could not delete Route Table (%s).' % route_table_name)
+
+            results.append(deleted)
+
+    return True if not False in results else False
 
 
 def create_subnets(vpc, zones='all', count=1, byte_aligned=True, balanced=False, public=False):
@@ -532,6 +669,40 @@ def create_subnets(vpc, zones='all', count=1, byte_aligned=True, balanced=False,
             subnets.append(subnet)
 
     return subnets
+
+
+def delete_subnets(subnets):
+    """
+    Delete existing Subnets.
+
+    :type vpc: list
+    :param vpc: A list of :class:`~boto.vpc.subnet.Subnet` objects that will be
+        deleted.
+
+        * See also: :func:`sky.networking.create_subnets`.
+
+    :rtype: bool
+    :return: ``True`` if the :class:`~boto.vpc.subnet.Subnet` objects were
+        successfully deleted. Otherwise, ``False``.
+    """
+
+    # Connect to the Amazon Virtual Private Cloud (Amazon VPC) service.
+    vpc_connection = connect_vpc()
+
+    results = list()
+    for subnet in subnets:
+        subnet_name = subnet.tags['Name']
+
+        logger.info('Deleting Subnet (%s).' % subnet_name)
+        deleted = vpc_connection.delete_subnet(subnet.id)
+        if deleted:
+            logger.info('Deleted Subnet (%s).' % subnet_name)
+        else:
+            logger.info('Could not delete Subnet (%s).' % subnet_name)
+
+        results.append(deleted)
+
+    return True if not False in results else False
 
 
 def create_subnet(vpc, zone, cidr_block, subnet_name=None, route_table=None):
