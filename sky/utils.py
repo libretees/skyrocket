@@ -30,6 +30,7 @@ def get_script(region, s3bucket, s3object, filename='user-data.sh'):
     :type filename: str
     :param filename: The path to a template user-data script.
     """
+
     template = open(filename).read()
     return Template(template).substitute(
         region=region,
@@ -39,6 +40,16 @@ def get_script(region, s3bucket, s3object, filename='user-data.sh'):
 
 
 def get_closest_region(service='ec2', repetitions=1):
+    """
+    Get the closest region for a particular service based on its average response time.
+
+    :type service: str
+    :param service: The service to attempt a connection to. By default, this is ``ec2``.
+
+    :type repetitions: int
+    :param repetitions: The number of measurements to take before calculating an average.
+    """
+
     regions = [region.name for region in regioninfo.get_regions(service) if 'gov' not in region.name and 'cn' not in region.name]
 
     latency = {}
@@ -52,6 +63,7 @@ def get_closest_region(service='ec2', repetitions=1):
 
     region = min(latency, key=latency.get)
     return region
+
 
 def make_tarfile(output_filename, source_dir):
     logger.info('Archiving directory (%s).' % source_dir)
