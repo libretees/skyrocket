@@ -584,19 +584,28 @@ def create_subnets(vpc, zones='all', count=1, byte_aligned=True, balanced=False,
     zones = ec2_connection.get_all_zones(zones)
 
     # Check for existing Subnets.
-    if config['CREATION_MODE'] == mode.PERMANENT:
+    cidr_blocks = None
+    if config['CREATION_MODE'] in [mode.PERMANENT, mode.EPHEMERAL]:
         existing_subnets = vpc_connection.get_all_subnets(filters={'vpc-id': vpc.id,
                                                                    'availability-zone': [zone.name for zone in zones],
                                                                    'tag:Type': 'public' if public else 'private',})
-
-        # Convert boto.resultset.ResultSet to a list of Subnet objects.
-        existing_subnets = [subnet for subnet in existing_subnets]
-
         # Return list of existing subnets, if they exist.
-        if len(existing_subnets) > 0:
+        if existing_subnets:
+            # Convert boto.resultset.ResultSet to a list of Subnet objects.
+            existing_subnets = [subnet for subnet in existing_subnets]
             logger.info('Found existing %s Subnets (%s).' % (('Public' if public else 'Private'), \
                                                               ', '.join([subnet.tags['Name'] for subnet in existing_subnets])))
-            return existing_subnets
+            if config['CREATION_MODE'] == mode.EPHEMERAL:
+                # Store freed-up CIDR blocks.
+                cidr_blocks = [subnet.cidr_block for subnet in existing_subnets]
+
+                delete_subnets(existing_subnets)
+                route_tables = vpc_connection.get_all_route_tables(filters={'vpc-id': vpc.id,
+                                                                            'tag:Type': 'public' if public else 'private',})
+                if route_tables:
+                    delete_route_tables(route_tables)
+            else:
+                return existing_subnets
 
     # Get the number of Subnets in each zone, so that a Subnet name can be computed.
     for zone in zones:
@@ -653,13 +662,16 @@ def create_subnets(vpc, zones='all', count=1, byte_aligned=True, balanced=False,
                 continue
             break # Give up.
 
-        # Create Subnet CIDR block.
-        subnet_network_ip = (network_ip | (num_subnets+i << 32-subnet_netmask))
-        subnet_cidr_block = str(subnet_network_ip >> 24) + '.' + \
-                            str((subnet_network_ip >> 16) & 255) + '.' + \
-                            str((subnet_network_ip >> 8) & 255) + '.' + \
-                            str(subnet_network_ip & 255) + '/' + \
-                            str(subnet_netmask)
+        if not cidr_blocks:
+            # Create Subnet CIDR block.
+            subnet_network_ip = (network_ip | (num_subnets+i << 32-subnet_netmask))
+            subnet_cidr_block = str(subnet_network_ip >> 24) + '.' + \
+                                str((subnet_network_ip >> 16) & 255) + '.' + \
+                                str((subnet_network_ip >> 8) & 255) + '.' + \
+                                str(subnet_network_ip & 255) + '/' + \
+                                str(subnet_netmask)
+        else:
+            subnet_cidr_block = cidr_blocks[i]
 
         # Create Subnet.
         subnet = create_subnet(vpc, zone, subnet_cidr_block, subnet_name, route_table)
