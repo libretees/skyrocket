@@ -874,7 +874,7 @@ def rotate_instances(load_balancer, instances, terminate_outgoing_instances=True
     '''
     Replace old EC2 Instances with new EC2 Instances from behind an Elastic Load Balancer (ELB).
 
-    This can be used to carry out seamless deployments. If EC2 Instances are currently registered to the ELB, they will be deregistered *and optionally terminated* only after incoming EC2 Instances pass a Health Check.
+    This can be used to carry out seamless (blue-green) deployments. If EC2 Instances are currently registered to the ELB, they will be deregistered *and optionally terminated* only after incoming EC2 Instances pass a Health Check.
 
     :type load_balancer: :class:`boto.ec2.elb.loadbalancer.LoadBalancer`
     :param load_balancer: The :class:`~boto.ec2.elb.loadbalancer.LoadBalancer`
