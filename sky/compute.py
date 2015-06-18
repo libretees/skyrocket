@@ -349,6 +349,7 @@ def delete_load_balancer(load_balancer):
     for group_id in group_ids:
         network_interfaces = ec2_connection.get_all_network_interfaces(filters={'group-id': group_id,})
         for network_interface in network_interfaces:
+            ec2_connection.detach_network_interface(network_interface.attachment.id) # attachment_id
             ec2_connection.delete_network_interface(network_interface_id=network_interface.id)
 
     # Clean up orphaned Security Group(s).

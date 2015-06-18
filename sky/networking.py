@@ -253,7 +253,7 @@ def delete_network(vpc):
         deleted. Otherwise, ``False``.
     """
     # Defer import to resolve interdependency between .networking and .compute modules.
-    from .compute import connect_ec2
+    from .compute import connect_ec2, delete_load_balancer
 
     # Connect to the Amazon Virtual Private Cloud (Amazon VPC) service.
     vpc_connection = connect_vpc()
@@ -261,10 +261,21 @@ def delete_network(vpc):
     # Connect to the Amazon Elastic Compute Cloud (Amazon EC2) service.
     ec2_connection = connect_ec2()
 
+    logger.debug('Connecting to the Amazon EC2 Load Balancing (Amazon ELB) service.')
+    elb_connection = boto.connect_elb()
+    logger.debug('Connected to the Amazon EC2 Load Balancing (Amazon ELB) service.')
+
     # Get name of VPC.
     vpc_tags = ec2_connection.get_all_tags(filters={'resource-id': vpc.id,
                                                     'resource-type': 'vpc'})
     vpc_name = next(tag.value for tag in vpc_tags if tag.name == 'Name')
+
+    # Delete any existing Load Balancers.
+    existing_load_balancers = [load_balancer for load_balancer in elb_connection.get_all_load_balancers() \
+                                                               if load_balancer.vpc_id ==vpc.id]
+    if len(existing_load_balancers):
+        for load_balancer in existing_load_balancers:
+            delete_load_balancer(load_balancer)
 
     # Delete any existing Subnets.
     existing_subnets = vpc_connection.get_all_subnets(filters={'vpc-id': vpc.id})
