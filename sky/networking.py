@@ -749,14 +749,18 @@ def create_subnet(vpc, zone, cidr_block, subnet_name=None, route_table=None):
     network_ip, netmask = get_cidr_block_components(cidr_block)
 
     # Check for existing Subnet.
-    if config['CREATION_MODE'] == mode.PERMANENT:
+    if config['CREATION_MODE'] in [mode.PERMANENT, mode.EPHEMERAL]:
         existing_subnet = vpc_connection.get_all_subnets(filters={'vpc-id': vpc.id,
                                                                   'availability-zone': zone.name,
                                                                   'cidrBlock' : cidr_block,
                                                                   'tag:Name' : subnet_name,})
         if len(existing_subnet):
             logger.info('Found existing Subnet (%s).' % existing_subnet.tags['Name'])
-            return existing_subnet[-1]
+            existing_subnet = existing_subnet[-1]
+            if config['CREATION_MODE'] == mode.EPHEMERAL:
+                delete_subnets([existing_subnet])
+            else:
+                return existing_subnet
 
     # Create Subnet.
     try:
