@@ -90,12 +90,16 @@ def create_security_group(vpc, name=None, database_backend=None, allowed_inbound
         name = '-'.join(['gp', config['PROJECT_NAME'], config['ENVIRONMENT']])
 
     # Check for existing Security Group.
-    if config['CREATION_MODE'] == mode.PERMANENT:
+    if config['CREATION_MODE'] in [mode.PERMANENT, mode.EPHEMERAL]:
         try:
             existing_security_group = ec2_connection.get_all_security_groups(filters={'group-name': name,})
             if len(existing_security_group):
+                existing_security_group = existing_security_group[-1]
                 logger.info('Found existing Security Group (%s).' % name)
-                return existing_security_group[-1]
+                if config['CREATION_MODE'] == mode.EPHEMERAL:
+                    delete_security_group(existing_security_group)
+                else:
+                    return existing_security_group
         except boto.exception.EC2ResponseError as error:
             if error.code == 'InvalidGroup.NotFound': # The requested Security Group doesn't exist.
                 pass
@@ -174,6 +178,41 @@ def create_security_group(vpc, name=None, database_backend=None, allowed_inbound
     return security_group
 
 
+def delete_security_group(security_group):
+    """
+    Delete a Security Group.
+
+    :type security_group: :class:`boto.ec2.securitygroup.SecurityGroup`
+    :param security_group: The :class:`~boto.ec2.securitygroup.SecurityGroup`
+        that will be deleted.
+
+        * See also: :func:`sky.compute.create_security_group`.
+
+    :rtype: bool
+    :return: ``True`` if the :class:`~boto.ec2.securitygroup.SecurityGroup`
+        was successfully deleted. Otherwise, ``False``.
+    """
+
+    # Connect to the Amazon Elastic Compute Cloud (Amazon EC2) service.
+    ec2_connection = connect_ec2()
+
+    # Get Security Group name.
+    sg_name = security_group.tags['Name']
+
+    # Delete Security Group.
+    logger.info('Deleting Security Group (%s).' % sg_name)
+    result = False
+    try:
+        result = ec2_connection.delete_security_group(group_id=security_group.id)
+        logger.info('Deleted Security Group (%s).' % sg_name)
+    except boto.exception.EC2ResponseError as error:
+        logger.info('Could not delete Security Group (%s).' % sg_name)
+        if error.code == 'DependencyViolation':
+            pass
+
+    return result
+
+
 def create_load_balancer(subnets, name=None, security_groups=None, ssl_certificate=None):
     """
     Create an Elastic Load Balancer (ELB).
@@ -216,13 +255,16 @@ def create_load_balancer(subnets, name=None, security_groups=None, ssl_certifica
         name = '-'.join(['elb', config['PROJECT_NAME'], config['ENVIRONMENT']])
 
     # Check for existing Load Balancer.
-    if config['CREATION_MODE'] == mode.PERMANENT:
+    if config['CREATION_MODE'] in [mode.PERMANENT, mode.EPHEMERAL]:
         try:
             existing_load_balancer = elb_connection.get_all_load_balancers(load_balancer_names=[name])
             if len(existing_load_balancer):
                 existing_load_balancer = existing_load_balancer[-1]
                 logger.info('Found existing Load Balancer (%s) at (%s).' % (existing_load_balancer.name, existing_load_balancer.dns_name))
-                return existing_load_balancer
+                if config['CREATION_MODE'] == mode.EPHEMERAL:
+                    delete_load_balancer(existing_load_balancer)
+                else:
+                    return existing_load_balancer
         except boto.exception.BotoServerError as error:
             if error.code == 'LoadBalancerNotFound': # The requested Load Balancer doesn't exist.
                 pass
@@ -245,17 +287,6 @@ def create_load_balancer(subnets, name=None, security_groups=None, ssl_certifica
                                                                           ,('HTTPS', '0.0.0.0/0')
                                                                           ,('DNS',   '0.0.0.0/0')])]
 
-    # Delete existing Elastic Load Balancer (ELB).
-    logger.info('Deleting Elastic Load Balancer (%s).' % name)
-    try:
-        elb_connection.delete_load_balancer(name)
-    except boto.exception.BotoServerError as error:
-        if error.status == 400: # Bad Request
-            logger.error('Couldn\'t delete Elastic Load Balancer (%s) due to a malformed request %s: %s.' % (name, error.status, error.reason))
-        if error.status == 404: # Not Found
-            logger.error('Elastic Load Balancer (%s) was not found. Error %s: %s.' % (name, error.status, error.reason))
-    logger.info('Deleted Elastic Load Balancer (%s).' % name)
-
     # Set up basic HTTP listener.
     complex_listeners = [(80, 80, 'HTTP', 'HTTP')]
 
@@ -275,6 +306,58 @@ def create_load_balancer(subnets, name=None, security_groups=None, ssl_certifica
     logger.info('Created Elastic Load Balancer (%s).' % name)
 
     return load_balancer
+
+
+def delete_load_balancer(load_balancer):
+    """
+    Delete a Load Balancer.
+
+    :type load_balancer: :class:`boto.ec2.elb.loadbalancer.LoadBalancer`
+    :param load_balancer: The :class:`~boto.ec2.elb.loadbalancer.LoadBalancer`
+        that will be deleted
+
+        * See also: :func:`sky.compute.create_load_balancer`.
+
+    :rtype: bool
+    :return: ``True`` if the :class:`~boto.ec2.elb.loadbalancer.LoadBalancer`
+        was successfully deleted. Otherwise, ``False``.
+    """
+
+    # Connect to the Amazon Elastic Compute Cloud (Amazon EC2) service.
+    ec2_connection = connect_ec2()
+
+    logger.debug('Connecting to the Amazon EC2 Load Balancing (Amazon ELB) service.')
+    elb_connection = boto.connect_elb()
+    logger.debug('Connected to the Amazon EC2 Load Balancing (Amazon ELB) service.')
+
+    # Delete existing Elastic Load Balancer (ELB).
+    logger.info('Deleting Elastic Load Balancer (%s).' % load_balancer.name)
+    result = False
+    try:
+        result = elb_connection.delete_load_balancer(load_balancer.name)
+    except boto.exception.BotoServerError as error:
+        if error.status == 400: # Bad Request
+            logger.error('Couldn\'t delete Elastic Load Balancer (%s) due to a malformed request %s: %s.' % (load_balancer.name, error.status, error.reason))
+        if error.status == 404: # Not Found
+            logger.error('Elastic Load Balancer (%s) was not found. Error %s: %s.' % (load_balancer.name, error.status, error.reason))
+    logger.info('Deleted Elastic Load Balancer (%s).' % load_balancer.name)
+
+    # Get Load Balancer Security Group ID(s).
+    group_ids = [group for group in load_balancer.security_groups]
+
+    # Delete Network Interface(s).
+    for group_id in group_ids:
+        network_interfaces = ec2_connection.get_all_network_interfaces(filters={'group-id': group_id,})
+        for network_interface in network_interfaces:
+            ec2_connection.delete_network_interface(network_interface_id=network_interface.id)
+
+    # Clean up orphaned Security Group(s).
+    security_groups = ec2_connection.get_all_security_groups(group_ids=group_ids)
+    if len(security_groups):
+        for security_group in security_groups:
+            delete_security_group(security_group)
+
+    return result
 
 
 def create_nat_instances(public_subnets, private_subnets, security_groups=None, image_id=None):

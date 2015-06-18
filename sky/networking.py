@@ -241,7 +241,7 @@ def create_network(name=None, cidr_block=None, network_class=None, internet_conn
 
 def delete_network(vpc):
     """
-    Delete an existing network.
+    Delete a network.
 
     :type vpc: :class:`boto.vpc.vpc.VPC`
     :param vpc: The :class:`~boto.vpc.vpc.VPC` that will be deleted.
@@ -354,7 +354,7 @@ def attach_internet_gateway(vpc):
 
 def delete_internet_gateways(internet_gateways):
     """
-    Delete existing Route Tables.
+    Delete an Internet Gateway.
 
     :type vpc: list
     :param vpc: A list of :class:`~boto.vpc.internetgateway.InternetGateway`
@@ -491,7 +491,7 @@ def create_route_table(vpc, name=None, internet_access=False):
 
 def delete_route_tables(route_tables):
     """
-    Delete existing Route Tables.
+    Delete Route Tables.
 
     :type vpc: list
     :param vpc: A list of :class:`~boto.vpc.routetable.RouteTable` objects that
@@ -685,7 +685,7 @@ def create_subnets(vpc, zones='all', count=1, byte_aligned=True, balanced=False,
 
 def delete_subnets(subnets):
     """
-    Delete existing Subnets.
+    Delete Subnets.
 
     :type vpc: list
     :param vpc: A list of :class:`~boto.vpc.subnet.Subnet` objects that will be
