@@ -889,7 +889,7 @@ def deregister_instances(load_balancer, instances):
                                                                 load_balancer.name))
 
 
-def get_instances(name=None, role=None, state='running'):
+def get_instances(vpc=None, name=None, role=None, state='running'):
     '''
     Query EC2 Instances.
 
@@ -920,6 +920,9 @@ def get_instances(name=None, role=None, state='running'):
     filters['tag:Project'] = config['PROJECT_NAME']
     filters['tag:Environment'] = config['ENVIRONMENT']
 
+    if vpc:
+        filters['vpc-id'] = vpc.id
+
     if name:
         filters['tag:Name'] = name
 
@@ -928,10 +931,10 @@ def get_instances(name=None, role=None, state='running'):
 
     # Get reservations by tag.
     reservations = ec2_connection.get_all_instances(filters=filters)
-    
+
     # Get instances from reservations.
     instances = [instance for reservation in reservations for instance in reservation.instances]
-    
+
     return instances
 
 
