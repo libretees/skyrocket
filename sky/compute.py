@@ -350,7 +350,13 @@ def delete_load_balancer(load_balancer):
         network_interfaces = ec2_connection.get_all_network_interfaces(filters={'group-id': group_id,})
         for network_interface in network_interfaces:
             ec2_connection.detach_network_interface(network_interface.attachment.id) # attachment_id
-            ec2_connection.delete_network_interface(network_interface_id=network_interface.id)
+            deleted = False
+            while not deleted:
+                try:
+                    deleted = ec2_connection.delete_network_interface(network_interface_id=network_interface.id)
+                except boto.exception.EC2ResponseError as error:
+                    if 'currently in use' in error.message:
+                        time.sleep(1)
 
     # Clean up orphaned Security Group(s).
     security_groups = ec2_connection.get_all_security_groups(group_ids=group_ids)
