@@ -1053,6 +1053,12 @@ def delete_instances(instances, attempts=3):
                     except boto.exception.EC2ResponseError as error:
                         if 'currently in use' in error.message:
                             time.sleep(1)
+                            
+        # Clean up orphaned Security Group(s).
+        security_groups = ec2_connection.get_all_security_groups(group_ids=list(group_ids))
+        if len(security_groups):
+            for security_group in security_groups:
+                delete_security_group(security_group)
     else:
         logger.info('Aborting wait for EC2 Instance (%s) termination.' % ', '.join([instance.tags['Name'] for instance in instances]))
 
