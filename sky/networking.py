@@ -196,8 +196,9 @@ def create_network(name=None, cidr_block=None, network_class=None, internet_conn
                                                                        'Environment': config['ENVIRONMENT'],
                                                                        'Type': 'main',})
             except boto.exception.EC2ResponseError as error:
-                if error.code == 'InvalidID': # Route Table hasn't registered with Virtual Private Cloud (VPC) service yet.
-                    pass
+                if error.code == 'InvalidRouteTableID.NotFound': # Route Table hasn't registered with Virtual Private Cloud (VPC) service yet.
+                    route_table = vpc_connection.get_all_route_tables(filters={'vpc-id': network.id,
+                                                                               'association.main': 'true',})[-1]
                 else:
                     raise boto.exception.EC2ResponseError
 
@@ -253,7 +254,7 @@ def delete_network(vpc):
         deleted. Otherwise, ``False``.
     """
     # Defer import to resolve interdependency between .networking and .compute modules.
-    from .compute import connect_ec2, delete_load_balancer
+    from .compute import connect_ec2, delete_load_balancer, delete_instances
 
     # Connect to the Amazon Virtual Private Cloud (Amazon VPC) service.
     vpc_connection = connect_vpc()
@@ -270,26 +271,32 @@ def delete_network(vpc):
                                                     'resource-type': 'vpc'})
     vpc_name = next(tag.value for tag in vpc_tags if tag.name == 'Name')
 
-    # Delete any existing Load Balancers.
+    # Delete any EC2 Instances.
+    existing_reservations = ec2_connection.get_all_instances(filters={'vpc-id': vpc.id})
+    if existing_reservations:
+        instances = [instance for reservation in existing_reservations for instance in reservation.instances]
+        delete_instances(instances)
+
+    # Delete any Load Balancers.
     existing_load_balancers = [load_balancer for load_balancer in elb_connection.get_all_load_balancers() \
                                                                if load_balancer.vpc_id ==vpc.id]
     if len(existing_load_balancers):
         for load_balancer in existing_load_balancers:
             delete_load_balancer(load_balancer)
 
-    # Delete any existing Subnets.
+    # Delete any Subnets.
     existing_subnets = vpc_connection.get_all_subnets(filters={'vpc-id': vpc.id})
     if existing_subnets:
         # Convert boto.resultset.ResultSet to a list of Subnet objects.
         existing_subnets = [subnet for subnet in existing_subnets]
         delete_subnets(existing_subnets)
 
-    # Delete any existing Internet Gateways.
+    # Delete any Internet Gateways.
     internet_gateways = vpc_connection.get_all_internet_gateways(filters={'attachment.vpc-id': vpc.id,})
     if internet_gateways:
         delete_internet_gateways(internet_gateways)
 
-    # Delete any existing Route Tables.
+    # Delete any Route Tables.
     route_tables = vpc_connection.get_all_route_tables(filters={'vpc-id': vpc.id,})
     if route_tables:
         delete_route_tables(route_tables)
@@ -298,6 +305,8 @@ def delete_network(vpc):
     vpc = vpc if not vpc_connection.delete_vpc(vpc.id) else None
     if not vpc:
         logger.info('Deleted Network (%s).' % vpc_name)
+        # Allow time for other AWS Services to sync.
+        time.sleep(5)
     else:
         logger.info('Could not delete Network (%s).' % vpc_name)
 
@@ -489,7 +498,8 @@ def create_route_table(vpc, name=None, internet_access=False):
                                                                    'Type': 'public' if internet_access else 'private',})
         except boto.exception.EC2ResponseError as error:
             if error.code == 'InvalidRouteTableID.NotFound': # Route Table hasn't registered with Virtual Private Cloud (VPC) service yet.
-                pass
+                route_table = vpc_connection.get_all_route_tables(filters={'vpc-id': vpc.id,
+                                                                           'association.main': 'false',})[-1]
             else:
                 raise boto.exception.EC2ResponseError(error.status, error.reason)
 
@@ -520,7 +530,7 @@ def delete_route_tables(route_tables):
 
     results = list()
     for route_table in route_tables:
-        route_table_name = route_table.tags['Name']
+        route_table_name = route_table.tags['Name'] if 'Name' in route_table.tags else 'Unnamed Route Table'
 
         main_route_table = vpc_connection.get_all_route_tables(route_table_ids=[route_table.id],
                                                                filters={'association.main': 'true',}) # Affected by boto Issue #1742 : https://github.com/boto/boto/issues/1742

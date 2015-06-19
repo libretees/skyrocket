@@ -462,13 +462,6 @@ def create_nat_instance(public_subnet, private_subnet, name=None, security_group
     if not name:
         name = '-'.join(['ec2', config['PROJECT_NAME'], config['ENVIRONMENT'], public_subnet.availability_zone, 'nat'])
 
-    # Check for existing NAT Server.
-    if config['CREATION_MODE'] == mode.PERMANENT:
-         nat_instances = get_instances(name=name, role='nat')
-         if len(nat_instances):
-             logger.info('Found existing NAT Server (%s).' % name)
-             return nat_instances
-
     # Get VPC from Subnets.
     vpc_id = set([subnet.vpc_id for subnet in [public_subnet, private_subnet]])
     if not len(vpc_id) == 1:
@@ -476,6 +469,16 @@ def create_nat_instance(public_subnet, private_subnet, name=None, security_group
     else:
         vpc_id = next(iter(vpc_id))
     vpc = vpc_connection.get_all_vpcs(vpc_ids=[vpc_id])[-1]
+
+    # Check for existing NAT Server.
+    if config['CREATION_MODE'] in [mode.PERMANENT, mode.EPHEMERAL]:
+        nat_instances = get_instances(vpc=vpc, name=name, state=['pending', 'running'], role='nat')
+        if len(nat_instances):
+            logger.info('Found existing NAT Server (%s).' % name)
+            if config['CREATION_MODE'] == mode.EPHEMERAL:
+                delete_instances(nat_instances)
+            else:
+                return nat_instances
 
     # Create Security Group, if one was not specified.
     if not security_groups:
@@ -905,35 +908,45 @@ def get_instances(vpc=None, name=None, role=None, state='running'):
     :param state: An *optional* EC2 Instance state. Valid values are
         ``pending``, ``running``, ``shutting-down``, ``terminated``,
         ``stopping``, and ``stopped``. By default, EC2 Instances in the
-        ``running`` state are returned.
+        ``running`` state are returned. This can also be specified as a list of
+        states.
 
     :rtype: list
     :return: A list of EC2 :class:`~boto.ec2.instance.Instance` objects.
    '''
 
-    # Connect to the Amazon Elastic Compute Cloud (Amazon EC2) service.
-    ec2_connection = connect_ec2()
+    instances = None
+    if isinstance(state, list):
+        states = state
+        instances = list()
+        for state in states:
+            instances += get_instances(vpc=vpc, name=name, role=role, state=state)
+    else:
+        # Connect to the Amazon Elastic Compute Cloud (Amazon EC2) service.
+        ec2_connection = connect_ec2()
 
-    # Set up filters.
-    filters = {}
-    filters['instance-state-name'] = state
-    filters['tag:Project'] = config['PROJECT_NAME']
-    filters['tag:Environment'] = config['ENVIRONMENT']
+        # Set up filters.
+        filters = {}
+        filters['tag:Project'] = config['PROJECT_NAME']
+        filters['tag:Environment'] = config['ENVIRONMENT']
 
-    if vpc:
-        filters['vpc-id'] = vpc.id
+        if vpc:
+            filters['vpc-id'] = vpc.id
 
-    if name:
-        filters['tag:Name'] = name
+        if name:
+            filters['tag:Name'] = name
 
-    if role:
-        filters['tag:Role'] = role
+        if role:
+            filters['tag:Role'] = role
 
-    # Get reservations by tag.
-    reservations = ec2_connection.get_all_instances(filters=filters)
+        if state:
+            filters['instance-state-name'] = state
 
-    # Get instances from reservations.
-    instances = [instance for reservation in reservations for instance in reservation.instances]
+        # Get reservations by tag.
+        reservations = ec2_connection.get_all_instances(filters=filters)
+
+        # Get instances from reservations.
+        instances = [instance for reservation in reservations for instance in reservation.instances]
 
     return instances
 
@@ -946,9 +959,11 @@ def terminate_instances(instances):
 
     :type instances: list
     :param instances: A list of EC2 :class:`~boto.ec2.instance.Instance` objects
-        that will be terminated.
 
         * See also: :func:`sky.compute.create_instances`.
+
+    :rtype: bool
+    :return: ``True``, if all EC2 :class:`~boto.ec2.instance.Instance` objects were terminated. Otherwise, ``False``.
     '''
 
     # Connect to the Amazon Elastic Compute Cloud (Amazon EC2) service.
@@ -956,11 +971,77 @@ def terminate_instances(instances):
     
     # Terminate EC2 instances.
     if instances:
-        logger.info('Terminating (%s).' % (', '.join([instance.tags['Name'] for instance in instances]) if len(instances) > 1 \
-                                                     else instances[-1].tags['Name']))
-        ec2_connection.terminate_instances(instance_ids=[instance.id for instance in instances])
-        logger.info('Terminated (%s).' % (', '.join([instance.tags['Name'] for instance in instances]) if len(instances) > 1 \
-                                                    else instances[-1].tags['Name']))
+        logger.info('Initiating termination of EC2 Instance (%s).' % (', '.join([instance.tags['Name'] for instance in instances]) if len(instances) > 1 \
+                                                                      else instances[-1].tags['Name']))
+        terminated_instances = ec2_connection.terminate_instances(instance_ids=[instance.id for instance in instances])
+        logger.info('Initiated termination of EC2 Instance (%s).' % (', '.join([instance.tags['Name'] for instance in instances]) if len(instances) > 1 \
+                                                                     else instances[-1].tags['Name']))
+
+    return len(instances) == len(terminated_instances)
+
+
+def delete_instances(instances, attempts=3):
+    '''
+    Delete EC2 Instances.
+
+    **Warning: On an EBS-backed instance, the default action is for the root EBS volume to be deleted when the instance is terminated. Storage on any local drives will be lost.**
+
+    :type instances: list
+    :param instances: A list of EC2 :class:`~boto.ec2.instance.Instance` objects
+        that will be deleted.
+
+        * See also: :func:`sky.compute.create_instances`.
+
+    :type attempts: int
+    :param attempts: The number of 10-second attempts to wait before moving on.
+        This is set to 30 seconds (``3``), by default.
+
+    :rtype: bool
+    :return: ``True``, if all EC2 :class:`~boto.ec2.instance.Instance` objects were deleted. Otherwise, ``False``.
+    '''
+
+    # Connect to the Amazon Elastic Compute Cloud (Amazon EC2) service.
+    ec2_connection = connect_ec2()
+
+    # Terminate NAT Instance.
+    terminate_instances(instances)
+
+    # Wait for NAT Instance to terminate.
+    states = [instance.state for instance in instances]
+    while not all(state == 'terminated' for state in states) and attempts:
+        logger.info('Terminating EC2 Instance (%s)...' % ', '.join([instance.tags['Name'] for instance in instances]))
+        time.sleep(10)
+        reservations = ec2_connection.get_all_instances(instance_ids=[instance.id for instance in instances])
+        states = [instance.state for reservation in reservations for instance in reservation.instances]
+        attempts -= 1
+
+    if all(state == 'terminated' for state in states):
+        logger.info('Terminated EC2 Instance (%s).' % ', '.join([instance.tags['Name'] for instance in instances]))
+        # Get Instance Security Group ID(s).
+        group_ids = set([group.id for instance in instances for group in instance.groups])
+
+        # Delete Network Interface(s).
+        for group_id in group_ids:
+            network_interfaces = ec2_connection.get_all_network_interfaces(filters={'group-id': group_id,})
+            for network_interface in network_interfaces:
+                ec2_connection.detach_network_interface(network_interface.attachment.id) # attachment_id
+                deleted = False
+                while not deleted:
+                    try:
+                        deleted = ec2_connection.delete_network_interface(network_interface_id=network_interface.id)
+                    except boto.exception.EC2ResponseError as error:
+                        if 'currently in use' in error.message:
+                            time.sleep(1)
+
+        # Clean up orphaned Security Group(s).
+        security_groups = ec2_connection.get_all_security_groups(group_ids=list(group_ids))
+        if len(security_groups):
+            for security_group in security_groups:
+                delete_security_group(security_group)
+    else:
+        logger.info('Aborting wait for EC2 Instance (%s) termination.' % ', '.join([instance.tags['Name'] for instance in instances]))
+
+    return all(state == 'terminated' for state in states)
 
 
 def rotate_instances(load_balancer, instances, terminate_outgoing_instances=True):
