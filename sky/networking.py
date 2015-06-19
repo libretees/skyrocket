@@ -254,7 +254,7 @@ def delete_network(vpc):
         deleted. Otherwise, ``False``.
     """
     # Defer import to resolve interdependency between .networking and .compute modules.
-    from .compute import connect_ec2, delete_load_balancer, delete_instances
+    from .compute import connect_ec2, delete_load_balancer, delete_instances, delete_security_group
 
     # Connect to the Amazon Virtual Private Cloud (Amazon VPC) service.
     vpc_connection = connect_vpc()
@@ -271,18 +271,30 @@ def delete_network(vpc):
                                                     'resource-type': 'vpc'})
     vpc_name = next(tag.value for tag in vpc_tags if tag.name == 'Name')
 
+    # Delete any Load Balancers.
+    existing_load_balancers = [load_balancer for load_balancer in elb_connection.get_all_load_balancers() \
+                                                               if load_balancer.vpc_id ==vpc.id]
+    for load_balancer in existing_load_balancers:
+        delete_load_balancer(load_balancer)
+
+    # Allow time for other AWS Services to sync.
+    time.sleep(5)
+
     # Delete any EC2 Instances.
     existing_reservations = ec2_connection.get_all_instances(filters={'vpc-id': vpc.id})
     if existing_reservations:
         instances = [instance for reservation in existing_reservations for instance in reservation.instances]
         delete_instances(instances)
 
-    # Delete any Load Balancers.
-    existing_load_balancers = [load_balancer for load_balancer in elb_connection.get_all_load_balancers() \
-                                                               if load_balancer.vpc_id ==vpc.id]
-    if len(existing_load_balancers):
-        for load_balancer in existing_load_balancers:
-            delete_load_balancer(load_balancer)
+    # Delete any non-default Security Groups.
+    default_security_group = ec2_connection.get_all_security_groups(filters={'vpc-id': vpc.id,
+                                                                             'group-name': 'default',})[-1]
+    existing_security_groups = ec2_connection.get_all_security_groups(filters={'vpc-id': vpc.id,})
+    for security_group in [security_group for security_group in existing_security_groups if security_group.id != default_security_group.id]:
+        delete_security_group(security_group)
+
+    # Allow time for other AWS Services to sync.
+    time.sleep(10)
 
     # Delete any Subnets.
     existing_subnets = vpc_connection.get_all_subnets(filters={'vpc-id': vpc.id})
@@ -301,12 +313,15 @@ def delete_network(vpc):
     if route_tables:
         delete_route_tables(route_tables)
 
+    # Allow time for other AWS Services to sync.
+    time.sleep(5)
+
     logger.info('Deleting Network (%s).' % vpc_name)
     vpc = vpc if not vpc_connection.delete_vpc(vpc.id) else None
     if not vpc:
-        logger.info('Deleted Network (%s).' % vpc_name)
         # Allow time for other AWS Services to sync.
         time.sleep(5)
+        logger.info('Deleted Network (%s).' % vpc_name)
     else:
         logger.info('Could not delete Network (%s).' % vpc_name)
 

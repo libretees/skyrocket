@@ -296,14 +296,20 @@ def create_load_balancer(subnets, name=None, security_groups=None, ssl_certifica
 
     # Create Elastic Load Balancer (ELB).
     logger.info('Creating Elastic Load Balancer (%s).' % name)
-    load_balancer = elb_connection.create_load_balancer(name, # name
-                                                        None, # zones             # Valid only for load balancers in EC2-Classic.
-                                                        listeners=None,
-                                                        subnets=[subnet.id for subnet in subnets],
-                                                        security_groups=[security_group.id for security_group in security_groups],
-                                                        scheme='internet-facing', # Valid only for load balancers in EC2-VPC.
-                                                        complex_listeners=complex_listeners)
-    logger.info('Created Elastic Load Balancer (%s).' % name)
+    load_balancer = None
+    while not load_balancer:
+        try:
+            load_balancer = elb_connection.create_load_balancer(name, # name
+                                                                None, # zones             # Valid only for load balancers in EC2-Classic.
+                                                                listeners=None,
+                                                                subnets=[subnet.id for subnet in subnets],
+                                                                security_groups=[security_group.id for security_group in security_groups],
+                                                                scheme='internet-facing', # Valid only for load balancers in EC2-VPC.
+                                                                complex_listeners=complex_listeners)
+            logger.info('Created Elastic Load Balancer (%s).' % name)
+        except boto.exception.BotoServerError as error:
+            if error.code == 'SubnetNotFound':
+                logger.error('Could not find Subnet (%s)' % ', '.join([subnet.id for subnet in subnets]))
 
     return load_balancer
 
@@ -349,14 +355,15 @@ def delete_load_balancer(load_balancer):
     for group_id in group_ids:
         network_interfaces = ec2_connection.get_all_network_interfaces(filters={'group-id': group_id,})
         for network_interface in network_interfaces:
-            ec2_connection.detach_network_interface(network_interface.attachment.id) # attachment_id
-            deleted = False
-            while not deleted:
-                try:
-                    deleted = ec2_connection.delete_network_interface(network_interface_id=network_interface.id)
-                except boto.exception.EC2ResponseError as error:
-                    if 'currently in use' in error.message:
-                        time.sleep(1)
+            if network_interface.attachment:
+                ec2_connection.detach_network_interface(network_interface.attachment.id) # attachment_id
+                deleted = False
+                while not deleted:
+                    try:
+                        deleted = ec2_connection.delete_network_interface(network_interface_id=network_interface.id)
+                    except boto.exception.EC2ResponseError as error:
+                        if 'currently in use' in error.message:
+                            time.sleep(1)
 
     # Clean up orphaned Security Group(s).
     security_groups = ec2_connection.get_all_security_groups(group_ids=group_ids)
@@ -470,11 +477,11 @@ def create_nat_instance(public_subnet, private_subnet, name=None, security_group
         vpc_id = next(iter(vpc_id))
     vpc = vpc_connection.get_all_vpcs(vpc_ids=[vpc_id])[-1]
 
-    # Check for existing NAT Server.
+    # Check for existing NAT Instance.
     if config['CREATION_MODE'] in [mode.PERMANENT, mode.EPHEMERAL]:
         nat_instances = get_instances(vpc=vpc, name=name, state=['pending', 'running'], role='nat')
         if len(nat_instances):
-            logger.info('Found existing NAT Server (%s).' % name)
+            logger.info('Found existing NAT Instance (%s).' % name)
             if config['CREATION_MODE'] == mode.EPHEMERAL:
                 delete_instances(nat_instances)
             else:
@@ -640,7 +647,8 @@ def create_instances(subnets, role=None, security_groups=None, script=None, inst
     instances = list()
     for subnet in subnets:
         instance = create_instance(subnet, role=role, security_groups=security_groups, script=script, instance_profile=instance_profile, os=os, image_id=image_id, key_name=key_name, internet_addressable=internet_addressable)
-        instances = instances.append(instance)
+        instances.append(instance)
+
     return instances
 
 
@@ -714,6 +722,19 @@ def create_instance(subnet, name=None, role=None, security_groups=None, script=N
 
     # Connect to the Amazon Elastic Compute Cloud (Amazon EC2) service.
     ec2_connection = connect_ec2()
+
+    # Check for existing EC2 Instance.
+    if config['CREATION_MODE'] in [mode.PERMANENT, mode.EPHEMERAL]:
+
+        instance = get_instances(vpc=subnet.vpc_id, name=name, state=['pending', 'running'], role=role) if name else None
+
+        if instance:
+            logger.info('Found existing EC2 Instance (%s).' % name)
+            instance = instance[-1]
+            if config['CREATION_MODE'] == mode.EPHEMERAL:
+                delete_instances([instance])
+            else:
+                return instance
 
     # Determine whether to use a start-up AMI or a specific AMI.
     if image_id:
@@ -931,7 +952,7 @@ def get_instances(vpc=None, name=None, role=None, state='running'):
         filters['tag:Environment'] = config['ENVIRONMENT']
 
         if vpc:
-            filters['vpc-id'] = vpc.id
+            filters['vpc-id'] = vpc if isinstance(vpc, str) else vpc.id
 
         if name:
             filters['tag:Name'] = name
@@ -1032,12 +1053,6 @@ def delete_instances(instances, attempts=3):
                     except boto.exception.EC2ResponseError as error:
                         if 'currently in use' in error.message:
                             time.sleep(1)
-
-        # Clean up orphaned Security Group(s).
-        security_groups = ec2_connection.get_all_security_groups(group_ids=list(group_ids))
-        if len(security_groups):
-            for security_group in security_groups:
-                delete_security_group(security_group)
     else:
         logger.info('Aborting wait for EC2 Instance (%s) termination.' % ', '.join([instance.tags['Name'] for instance in instances]))
 
