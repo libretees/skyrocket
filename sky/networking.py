@@ -275,26 +275,32 @@ def delete_network(vpc):
     existing_load_balancers = [load_balancer for load_balancer in elb_connection.get_all_load_balancers() \
                                                                if load_balancer.vpc_id ==vpc.id]
     for load_balancer in existing_load_balancers:
+        # Delete Load Balancer(s).
         delete_load_balancer(load_balancer)
-
-    # Allow time for other AWS Services to sync.
-    time.sleep(5)
+        
+        # Allow time for other AWS Services to sync.
+        time.sleep(5)
 
     # Delete any EC2 Instances.
     existing_reservations = ec2_connection.get_all_instances(filters={'vpc-id': vpc.id})
     if existing_reservations:
+        # Delete EC2 Instance(s).
         instances = [instance for reservation in existing_reservations for instance in reservation.instances]
         delete_instances(instances)
+
+        # Allow time for other AWS Services to sync.
+        time.sleep(5)
 
     # Delete any non-default Security Groups.
     default_security_group = ec2_connection.get_all_security_groups(filters={'vpc-id': vpc.id,
                                                                              'group-name': 'default',})[-1]
     existing_security_groups = ec2_connection.get_all_security_groups(filters={'vpc-id': vpc.id,})
     for security_group in [security_group for security_group in existing_security_groups if security_group.id != default_security_group.id]:
+        # Delete Security Group(s).
         delete_security_group(security_group)
-
-    # Allow time for other AWS Services to sync.
-    time.sleep(10)
+        
+        # Allow time for other AWS Services to sync.
+        time.sleep(5)
 
     # Delete any Subnets.
     existing_subnets = vpc_connection.get_all_subnets(filters={'vpc-id': vpc.id})
@@ -316,9 +322,9 @@ def delete_network(vpc):
     # Allow time for other AWS Services to sync.
     time.sleep(5)
 
+    # Delete the VPC.
     logger.info('Deleting Network (%s).' % vpc_name)
-    vpc = vpc if not vpc_connection.delete_vpc(vpc.id) else None
-    if not vpc:
+    if vpc_connection.delete_vpc(vpc.id):
         # Allow time for other AWS Services to sync.
         time.sleep(5)
         logger.info('Deleted Network (%s).' % vpc_name)
