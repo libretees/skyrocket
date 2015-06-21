@@ -55,7 +55,7 @@ def get_closest_region(service='ec2', repetitions=1):
     latency = {}
     for region in regions:
         connection = Timer("h.request('GET', '/')",
-                           "from http.client import HTTPSConnection; h=HTTPSConnection('ec2.%s.amazonaws.com')" % region)
+                           "from http.client import HTTPSConnection; h=HTTPSConnection('%s.%s.amazonaws.com')" % (service, region))
         times = connection.repeat(repetitions, 1)
         avg_latency = sum(times)/float(len(times))
         latency[region] = avg_latency
