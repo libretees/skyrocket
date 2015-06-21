@@ -278,7 +278,7 @@ def delete_network(vpc):
         # Delete Load Balancer(s).
         delete_load_balancer(load_balancer)
         
-        # Allow time for other AWS Services to sync.
+        # Allow time for AWS Services to sync.
         time.sleep(5)
 
     # Delete any EC2 Instances.
@@ -288,7 +288,7 @@ def delete_network(vpc):
         instances = [instance for reservation in existing_reservations for instance in reservation.instances]
         delete_instances(instances)
 
-        # Allow time for other AWS Services to sync.
+        # Allow time for AWS Services to sync.
         time.sleep(5)
 
     # Delete any non-default Security Groups.
@@ -299,7 +299,7 @@ def delete_network(vpc):
         # Delete Security Group(s).
         delete_security_group(security_group)
         
-        # Allow time for other AWS Services to sync.
+        # Allow time for AWS Services to sync.
         time.sleep(5)
 
     # Delete any Subnets.
@@ -319,7 +319,7 @@ def delete_network(vpc):
     if route_tables:
         delete_route_tables(route_tables)
 
-    # Allow time for other AWS Services to sync.
+    # Allow time for AWS Services to sync.
     time.sleep(5)
 
     # Delete the VPC.
