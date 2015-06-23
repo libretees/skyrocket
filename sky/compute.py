@@ -1056,7 +1056,10 @@ def delete_instances(instances, attempts=3):
                     except boto.exception.EC2ResponseError as error:
                         if 'currently in use' in error.message:
                             time.sleep(1)
-                            
+
+        # Allow time for AWS Services to sync.
+        time.sleep(5)
+
         # Clean up orphaned Security Group(s).
         security_groups = ec2_connection.get_all_security_groups(group_ids=list(group_ids))
         if len(security_groups):

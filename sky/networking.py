@@ -277,7 +277,7 @@ def delete_network(vpc):
     for load_balancer in existing_load_balancers:
         # Delete Load Balancer(s).
         delete_load_balancer(load_balancer)
-        
+
         # Allow time for AWS Services to sync.
         time.sleep(5)
 
