@@ -2,7 +2,7 @@ import sys
 import time
 import logging
 import boto
-from .compute import create_security_group
+from .compute import connect_ec2, create_security_group
 from .networking import connect_vpc
 from .state import config, mode
 
@@ -356,6 +356,9 @@ def create_database(subnets, name=None, engine='postgresql', storage=5, applicat
         # Connect to the Amazon Virtual Private Cloud (Amazon VPC) service.
         vpc_connection = connect_vpc()
 
+        # Connect to the Amazon Elastic Compute Cloud (Amazon EC2) service.
+        ec2_connection = connect_ec2()
+
         # Get VPC from Subnets.
         vpc_id = set([subnet.vpc_id for subnet in subnets])
         if not len(vpc_id) == 1:
@@ -384,10 +387,20 @@ def create_database(subnets, name=None, engine='postgresql', storage=5, applicat
 
         # Create Security Group.
         sg_name = '-'.join(['gp', config['PROJECT_NAME'], config['ENVIRONMENT'], 'db'])
-        security_groups = [create_security_group(vpc,
-                                                 name=sg_name,
-                                                 allowed_inbound_traffic=inbound_rules if application_security_groups else [],
-                                                 allowed_outbound_traffic=[])] # Outbound rules do not apply to RDS instances (per http://docs.aws.amazon.com/AmazonRDS/latest/UserGuide/Overview.RDSSecurityGroups.html).
+        database_security_group = create_security_group(vpc,
+                                                        name=sg_name,
+                                                        allowed_inbound_traffic=inbound_rules if application_security_groups else [],
+                                                        allowed_outbound_traffic=[]) # Outbound rules do not apply to RDS instances (per http://docs.aws.amazon.com/AmazonRDS/latest/UserGuide/Overview.RDSSecurityGroups.html).
+
+        for application_security_group_id in application_security_group_ids:
+            ec2_connection.authorize_security_group_egress(application_security_group_id,
+                                                           'tcp',
+                                                           from_port=INBOUND_PORT[engine],
+                                                           to_port=INBOUND_PORT[engine],
+                                                           src_group_id=database_security_group.id,
+                                                           cidr_ip=None)
+
+        security_groups = [database_security_group]
 
     logger.info('Creating Database Instance (%s)' % name)
     db_instance = rds_connection.create_db_instance(name,                                                     # db_instance_identifier
