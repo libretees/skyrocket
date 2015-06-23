@@ -305,20 +305,28 @@ def create_database(subnets, name=None, engine='postgresql', storage=5, applicat
                          config['ENVIRONMENT'],])
 
     # Check for existing Database.
-    if config['CREATION_MODE'] == mode.PERMANENT:
+    if config['CREATION_MODE'] in [mode.PERMANENT, mode.EPHEMERAL]:
         try:
             response = rds_connection.describe_db_instances(db_instance_identifier=name)
             if len(response):
                 db_instance = response['DescribeDBInstancesResponse']\
                                       ['DescribeDBInstancesResult']\
                                       ['DBInstances'][-1]
-                endpoint = response['DescribeDBInstancesResponse']\
-                                   ['DescribeDBInstancesResult']\
-                                   ['DBInstances'][-1]\
-                                   ['Endpoint']
+                endpoint = db_instance['Endpoint']
                 db_instance['endpoint'] = endpoint
                 logger.info('Found existing Database (%s) at (%s:%s).' % (name, endpoint['Address'], endpoint['Port']))
-                return db_instance
+                if config['CREATION_MODE'] == mode.EPHEMERAL:
+                    logger.info('Initiating Database Instance (%s) deletion.' % name)
+                    db_instance_identifier = db_instance['DBInstanceIdentifier']
+                    rds_connection.delete_db_instance(db_instance_identifier, skip_final_snapshot=True)
+                    logger.info('Initiated Database Instance (%s) deletion.' % name)
+                    while len(response):
+                        response = rds_connection.describe_db_instances(db_instance_identifier=name)
+                        logger.info('Deleting Database Instance (%s)...' % name)
+                        time.sleep(60)
+                    logger.info('Deleted Database Instance (%s).' % name)
+                else:
+                    return db_instance
         except boto.rds2.exceptions.DBInstanceNotFound as error:
             if error.code == 'DBInstanceNotFound': # The requested Database doesn't exist.
                 pass
@@ -381,6 +389,7 @@ def create_database(subnets, name=None, engine='postgresql', storage=5, applicat
                                                  allowed_inbound_traffic=inbound_rules if application_security_groups else [],
                                                  allowed_outbound_traffic=[])] # Outbound rules do not apply to RDS instances (per http://docs.aws.amazon.com/AmazonRDS/latest/UserGuide/Overview.RDSSecurityGroups.html).
 
+    logger.info('Creating Database Instance (%s)' % name)
     db_instance = rds_connection.create_db_instance(name,                                                     # db_instance_identifier
                                                     storage,                                                  # allocated_storage
                                                     'db.t2.micro',                                            # db_instance_class
@@ -406,6 +415,7 @@ def create_database(subnets, name=None, engine='postgresql', storage=5, applicat
                                                     character_set_name=None,
                                                     publicly_accessible=publicly_accessible,
                                                     tags=None)
+    logger.info('Created Database Instance (%s)' % name)
 
     # Construct Database Instance ARN.
     region = 'us-east-1'
@@ -420,7 +430,7 @@ def create_database(subnets, name=None, engine='postgresql', storage=5, applicat
     logger.debug('Tagged Amazon RDS Resource (%s).' % database_arn)
 
     # Get Database Endpoint.
-    logger.info('Getting endpoint for database (%s).' % name)
+    logger.info('Getting Endpoint for Database Instance (%s).' % name)
     endpoint = None
     while not endpoint:
         response = rds_connection.describe_db_instances(db_instance_identifier=name,
@@ -432,10 +442,10 @@ def create_database(subnets, name=None, engine='postgresql', storage=5, applicat
                            ['DBInstances'][-1]\
                            ['Endpoint']
         if not endpoint:
-            logger.debug('Waiting for database endpoint...')
+            logger.debug('Waiting for Database Endpoint...')
             time.sleep(1)
         else:
-            logger.info('Got database endpoint (%s).' % endpoint)
+            logger.info('Got Database Endpoint (%s).' % endpoint)
     db_instance['endpoint'] = endpoint
 
     return db_instance
