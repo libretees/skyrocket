@@ -1174,3 +1174,20 @@ def rotate_instances(load_balancer, instances, terminate_outgoing_instances=True
         logger.info('Rotated incoming EC2 Instances (%s) and outgoing EC2 instances (%s) under Load Balancer (%s).' % (new_instance_names,
                                                                                                                        old_instance_names,
                                                                                                                        load_balancer.name))
+
+
+def allocate_address():
+    """
+    Allocate a Static (Elastic) IP Address.
+
+    :rtype: :class:`boto.ec2.address.Address`
+    :return: A Static IP :class:`~boto.ec2.address.Address`.
+    """
+
+    # Connect to the Amazon Elastic Compute Cloud (Amazon EC2) service.
+    ec2_connection = connect_ec2()
+
+    # Allocate a Static IP Address.
+    address = ec2_connection.allocate_address(domain='vpc')
+
+    return address
