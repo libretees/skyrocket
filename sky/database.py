@@ -499,9 +499,6 @@ def delete_database(name):
                 response = rds_connection.describe_db_instances(db_instance_identifier=name)
                 logger.info('Deleting Database Instance (%s)...' % name)
                 time.sleep(60)
-            except boto.exception.JSONResponseError as error:
-                if error.body['Error']['Code'] == 'Throttling':
-                    time.sleep(60)
             except boto.rds2.exceptions.DBInstanceNotFound as error:
                 if error.code == 'DBInstanceNotFound':
                     pass

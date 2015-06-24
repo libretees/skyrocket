@@ -199,6 +199,30 @@ def delete_security_group(security_group):
     # Get Security Group name.
     sg_name = security_group.tags['Name']
 
+    # Revoke rules from dependent Security Groups.
+    existing_security_groups = ec2_connection.get_all_security_groups(filters={'vpc-id': security_group.vpc_id,})
+    existing_security_groups = [existing_security_group for existing_security_group in existing_security_groups if existing_security_group.id != security_group.id]
+    for existing_security_group in existing_security_groups:
+        # Revoke Inbound rules.
+        for rule in existing_security_group.rules:
+            for grant in [grant for grant in rule.grants if grant.group_id == security_group.id]:
+                ec2_connection.revoke_security_group(group_id=existing_security_group.id,
+                                                     ip_protocol=rule.ip_protocol,
+                                                     from_port=rule.from_port,
+                                                     to_port=rule.to_port,
+                                                     src_security_group_group_id=grant.group_id,
+                                                     cidr_ip=grant.cidr_ip)
+
+        # Revoke Outbound rules.
+        for rule in existing_security_group.rules_egress:
+            for grant in [grant for grant in rule.grants if grant.group_id == security_group.id]:
+                ec2_connection.revoke_security_group_egress(existing_security_group.id,
+                                                            rule.ip_protocol,
+                                                            from_port=rule.from_port,
+                                                            to_port=rule.to_port,
+                                                            src_group_id=grant.group_id,
+                                                            cidr_ip=grant.cidr_ip)
+
     # Delete Security Group.
     logger.info('Deleting Security Group (%s).' % sg_name)
     result = False
