@@ -256,11 +256,17 @@ def delete_network(vpc):
     # Defer import to resolve interdependency between .networking and .compute modules.
     from .compute import connect_ec2, delete_load_balancer, delete_instances, delete_security_group
 
+    # Defer import to resolve interdependency between .networking and .database modules.
+    from .database import connect_rds, delete_database
+
     # Connect to the Amazon Virtual Private Cloud (Amazon VPC) service.
     vpc_connection = connect_vpc()
 
     # Connect to the Amazon Elastic Compute Cloud (Amazon EC2) service.
     ec2_connection = connect_ec2()
+
+    # Connect to the Amazon Relational Database Service (Amazon RDS).
+    rds_connection = connect_rds()
 
     logger.debug('Connecting to the Amazon EC2 Load Balancing (Amazon ELB) service.')
     elb_connection = boto.connect_elb()
@@ -270,6 +276,17 @@ def delete_network(vpc):
     vpc_tags = ec2_connection.get_all_tags(filters={'resource-id': vpc.id,
                                                     'resource-type': 'vpc'})
     vpc_name = next(tag.value for tag in vpc_tags if tag.name == 'Name')
+
+    # Delete any Database Instances.
+    response = rds_connection.describe_db_instances()
+    if response:
+        db_instances = response['DescribeDBInstancesResponse']['DescribeDBInstancesResult']['DBInstances']
+        for db_instance_id in [db_instance['DBInstanceIdentifier'] for db_instance in db_instances if db_instance['DBSubnetGroup']['VpcId'] == vpc.id]:
+            # Delete Database Instance.
+            delete_database(db_instance_id)
+
+        # Allow time for AWS Services to sync.
+        time.sleep(5)
 
     # Delete any Load Balancers.
     existing_load_balancers = [load_balancer for load_balancer in elb_connection.get_all_load_balancers() \

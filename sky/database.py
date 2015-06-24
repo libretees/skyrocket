@@ -197,21 +197,32 @@ def create_option_group(name=None, engine='postgresql'):
                          config['PROJECT_NAME'],
                          config['ENVIRONMENT'],])
 
-    # Delete Option Group.
-    try:
-        rds_connection.delete_option_group(name)
-    except boto.exception.JSONResponseError as error:
-        if error.status == 404 and error.reason == 'Not Found' and error.body['Error']['Code'] == 'OptionGroupNotFoundFault':
-            pass
-        else:
-            raise boto.exception.JSONResponseError(error.status, error.reason, body=error.body)
+    # Check for existing Option Group.
+    if config['CREATION_MODE'] in [mode.PERMANENT, mode.EPHEMERAL]:
+        try:
+            response = rds_connection.describe_option_groups(option_group_name=name)
+            if response:
+                option_group = response['DescribeOptionGroupsResponse']\
+                                       ['DescribeOptionGroupsResult']\
+                                       ['OptionGroupsList'][-1]
+                logger.info('Found existing Option Group (%s).' % option_group['OptionGroupName'])
+                if config['CREATION_MODE'] == mode.EPHEMERAL:
+                    # Delete Option Group.
+                    rds_connection.delete_option_group(name)
+                else:
+                    return option_group
+        except boto.exception.JSONResponseError as error:
+            if error.body['Error']['Code'] == 'OptionGroupNotFoundFault':
+                pass
 
     # Create Option Group.
+    logger.info('Creating Option Group (%s).' % name)
     option_group = rds_connection.create_option_group(name,                                     # option_group_name
                                                       ENGINE_NAME[engine],                      # engine_name
                                                       MAJOR_ENGINE_VERSION[engine],             # major_engine_version
                                                       ' '.join([config['PROJECT_NAME'], 'Option Group']), # option_group_description
                                                       tags=None)
+    logger.info('Created Option Group (%s).' % name)
 
     # Construct Option Group ARN.
     region = 'us-east-1'
@@ -225,12 +236,16 @@ def create_option_group(name=None, engine='postgresql'):
                                          ('Environment', config['ENVIRONMENT']  )])
     logger.debug('Tagged Amazon RDS Resource (%s).' % option_group_arn)
 
+    option_group = option_group['CreateOptionGroupResponse']\
+                               ['CreateOptionGroupResult']\
+                               ['OptionGroup']
+
     return option_group
 
 
 def create_database(subnets, name=None, engine='postgresql', storage=5, application_instances=None, application_security_groups=None, security_groups=None, publicly_accessible=False, multi_az=False, db_parameter_group=None, option_group=None):
     """
-    Create Database Instance.
+    Create a Database Instance.
 
     :type subnets: list
     :param subnets: A list of at least two :class:`~boto.vpc.subnet.Subnet`
@@ -308,7 +323,7 @@ def create_database(subnets, name=None, engine='postgresql', storage=5, applicat
     if config['CREATION_MODE'] in [mode.PERMANENT, mode.EPHEMERAL]:
         try:
             response = rds_connection.describe_db_instances(db_instance_identifier=name)
-            if len(response):
+            if response:
                 db_instance = response['DescribeDBInstancesResponse']\
                                       ['DescribeDBInstancesResult']\
                                       ['DBInstances'][-1]
@@ -316,15 +331,7 @@ def create_database(subnets, name=None, engine='postgresql', storage=5, applicat
                 db_instance['endpoint'] = endpoint
                 logger.info('Found existing Database (%s) at (%s:%s).' % (name, endpoint['Address'], endpoint['Port']))
                 if config['CREATION_MODE'] == mode.EPHEMERAL:
-                    logger.info('Initiating Database Instance (%s) deletion.' % name)
-                    db_instance_identifier = db_instance['DBInstanceIdentifier']
-                    rds_connection.delete_db_instance(db_instance_identifier, skip_final_snapshot=True)
-                    logger.info('Initiated Database Instance (%s) deletion.' % name)
-                    while len(response):
-                        response = rds_connection.describe_db_instances(db_instance_identifier=name)
-                        logger.info('Deleting Database Instance (%s)...' % name)
-                        time.sleep(60)
-                    logger.info('Deleted Database Instance (%s).' % name)
+                    delete_database(name)
                 else:
                     return db_instance
         except boto.rds2.exceptions.DBInstanceNotFound as error:
@@ -347,10 +354,7 @@ def create_database(subnets, name=None, engine='postgresql', storage=5, applicat
                                           ['DBSubnetGroup']\
                                           ['DBSubnetGroupName']
 
-    option_group_name = option_group['CreateOptionGroupResponse']\
-                                    ['CreateOptionGroupResult']\
-                                    ['OptionGroup']\
-                                    ['OptionGroupName']
+    option_group_name = option_group['OptionGroupName']
 
     if not security_groups:
         # Connect to the Amazon Virtual Private Cloud (Amazon VPC) service.
@@ -462,3 +466,46 @@ def create_database(subnets, name=None, engine='postgresql', storage=5, applicat
     db_instance['endpoint'] = endpoint
 
     return db_instance
+
+
+def delete_database(name):
+    """
+    Delete a Database Instance.
+
+    :type name: str
+    :param name: The name of the Database Instance to delete.
+
+    :rtype: bool
+    :return: ``True`` if the Database Instance was successfully deleted.
+        Otherwise, ``False``.
+    """
+
+    # Connect to the Amazon Relational Database Service (Amazon RDS).
+    rds_connection = connect_rds()
+
+    response = rds_connection.describe_db_instances(db_instance_identifier=name)
+
+    if response:
+        db_instance = response['DescribeDBInstancesResponse']\
+                      ['DescribeDBInstancesResult']\
+                      ['DBInstances'][-1]
+        db_instance_identifier = db_instance['DBInstanceIdentifier']
+        logger.info('Initiating Database Instance (%s) deletion.' % name)
+        rds_connection.delete_db_instance(db_instance_identifier, skip_final_snapshot=True)
+        logger.info('Initiated Database Instance (%s) deletion.' % name)
+
+        while response:
+            try:
+                response = rds_connection.describe_db_instances(db_instance_identifier=name)
+                logger.info('Deleting Database Instance (%s)...' % name)
+                time.sleep(60)
+            except boto.exception.JSONResponseError as error:
+                if error.body['Error']['Code'] == 'Throttling':
+                    time.sleep(60)
+            except boto.rds2.exceptions.DBInstanceNotFound as error:
+                if error.code == 'DBInstanceNotFound':
+                    pass
+
+        logger.info('Deleted Database Instance (%s).' % name)
+
+    return True if not response else False
