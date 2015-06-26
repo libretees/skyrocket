@@ -2,13 +2,13 @@
 from distutils.core import setup
 
 setup(
-    name = 'skyman',
+    name = 'skyrocket',
     packages = ['sky'],
     version = '0.1',
     description = 'Sky is a tool that allows quick and repeatable deployment and management of cloud environments.',
     author = 'Jared Contrascere',
     author_email = 'jcontra@gmail.com',
-    url = 'https://github.com/libretees/sky',
+    url = 'https://github.com/libretees/skyrocket',
 
     install_requires=['boto==2.36.0'],
     entry_points={
