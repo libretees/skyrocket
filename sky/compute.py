@@ -593,7 +593,7 @@ def create_nat_instance(public_subnet, private_subnet, name=None, security_group
     return nat_instance
 
 
-def create_instances(subnets, role=None, security_groups=None, script=None, instance_profile=None, os='ubuntu', image_id=None, key_name=None, internet_addressable=False):
+def create_instances(subnets, role=None, security_groups=None, script=None, instance_profile=None, os='ubuntu', image_id=None, key_name=None, internet_addressable=False, tags={}):
     '''
     Create EC2 Instances across subnets.
 
@@ -646,6 +646,9 @@ def create_instances(subnets, role=None, security_groups=None, script=None, inst
         will be associated to the EC2 Instances. By default, the EC2 Instances
         are *not* Internet-addressable.
 
+    :type tags: dict
+    :param tags: A dictionary containing custom tags for the EC2 Instance.
+
     :rtype: list
     :return: A list of EC2 :class:`~boto.ec2.instance.Instance` objects.
     '''
@@ -673,13 +676,13 @@ def create_instances(subnets, role=None, security_groups=None, script=None, inst
     # Create EC2 instances.
     instances = list()
     for subnet in subnets:
-        instance = create_instance(subnet, role=role, security_groups=security_groups, script=script, instance_profile=instance_profile, os=os, image_id=image_id, key_name=key_name, internet_addressable=internet_addressable)
+        instance = create_instance(subnet, role=role, security_groups=security_groups, script=script, instance_profile=instance_profile, os=os, image_id=image_id, key_name=key_name, internet_addressable=internet_addressable, tags=tags)
         instances.append(instance)
 
     return instances
 
 
-def create_instance(subnet, name=None, role=None, security_groups=None, script=None, instance_profile=None, os='ubuntu', image_id=None, key_name=None, internet_addressable=False):
+def create_instance(subnet, name=None, role=None, security_groups=None, script=None, instance_profile=None, os='ubuntu', image_id=None, key_name=None, internet_addressable=False, tags={}):
     '''
     Create an EC2 Instance.
 
@@ -734,6 +737,9 @@ def create_instance(subnet, name=None, role=None, security_groups=None, script=N
         accessible via the Internet. If set to ``True``, a Public IP address
         will be associated to the EC2 Instance. By default, an EC2 Instance is
         *not* Internet-addressable.
+
+    :type tags: dict
+    :param tags: A dictionary containing custom tags for the EC2 Instance.
 
     :rtype: :class:`boto.ec2.instance.Instance`
     :return: An EC2 Instance.
@@ -803,9 +809,9 @@ def create_instance(subnet, name=None, role=None, security_groups=None, script=N
     while not tagged:
         try:
             # Set up tags.
-            tags = {'Name': name,
-                    'Project': config['PROJECT_NAME'],
-                    'Environment': config['ENVIRONMENT'],}
+            tags = tags.update({'Name': name,
+                                'Project': config['PROJECT_NAME'],
+                                'Environment': config['ENVIRONMENT'],})
             if role:
                 tags['Role'] = role
 
