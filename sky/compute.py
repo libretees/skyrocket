@@ -809,9 +809,10 @@ def create_instance(subnet, name=None, role=None, security_groups=None, script=N
     while not tagged:
         try:
             # Set up tags.
-            tags = tags.update({'Name': name,
-                                'Project': config['PROJECT_NAME'],
-                                'Environment': config['ENVIRONMENT'],})
+            tags.update({'Name': name,
+                         'Project': config['PROJECT_NAME'],
+                         'Environment': config['ENVIRONMENT'],})
+
             if role:
                 tags['Role'] = role
 
