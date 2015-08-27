@@ -2,11 +2,36 @@ import sys
 import time
 import logging
 import boto
+from boto.compat import json
+from boto.rds2.layer1 import RDSConnection
 from .compute import connect_ec2, create_security_group
 from .networking import connect_vpc
 from .state import config, mode
 
 logger = logging.getLogger(__name__)
+
+# Create patch function for Boto Issue #2677 (https://github.com/boto/boto/issues/2677)
+def _make_request_fix(self, action, verb, path, params):
+    params['ContentType'] = 'JSON'
+    response = self.make_request(action=action, verb='POST',
+                                 path='/', params=params)
+    body = response.read()
+    boto.log.debug(body)
+    if type(body) == bytes:
+        body = body.decode('utf-8') # This is the fix.
+    if response.status == 200:
+        return json.loads(body)
+    else:
+        json_body = json.loads(body)
+        fault_name = json_body.get('Error', {}).get('Code', None)
+        exception_class = self._faults.get(fault_name, self.ResponseError)
+        raise exception_class(response.status, response.reason,
+                              body=json_body)
+
+# Patch boto.rds2.layer1.RDSConnection class method at runtime.
+logger.debug('Patching boto.rds2.layer1.RDSConnection._make_request for use with Python 3.4.1.')
+RDSConnection._make_request = _make_request_fix
+logger.debug('Patched boto.rds2.layer1.RDSConnection._make_request for use with Python 3.4.1.')
 
 ENGINE = {
     'postgresql': 'postgres9.4',
@@ -31,6 +56,7 @@ INBOUND_PORT = {
     'mysql':      3306,
     'oracle':     1520,
 }
+
 
 def connect_rds():
     """
