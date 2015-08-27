@@ -161,10 +161,10 @@ def parse_arguments():
         valid_arguments = False
 
     try:
-        assert search(r'^\d{12}$', args.account_id)
+        assert args.account_id and search(r'^\d{12}$', args.account_id)
         logger.debug('AWS Account ID argument validated (%s).' % args.account_id)
     except AssertionError:
-        if len(args.account_id):
+        if args.account_id:
             logger.error('AWS Account ID must be exactly 12 digits (%s).' % args.account_id)
         else:
             logger.error('AWS Account ID not specified.')
@@ -180,6 +180,8 @@ def parse_arguments():
     elif os.path.exists('/etc/boto.cfg'):
         config_path = '/etc/boto.cfg'
 
+    key_id = None
+    key = None
     if config_path:
         config = ConfigParser()
         config.sections()
@@ -193,10 +195,10 @@ def parse_arguments():
 
     try:
         args.key_id = args.key_id or key_id
-        assert search(r'^[A-Z0-9]{20}$', args.key_id, IGNORECASE)
+        assert args.key_id and search(r'^[A-Z0-9]{20}$', args.key_id, IGNORECASE)
         logger.debug('AWS Access Key ID argument validated (%s).' % args.key_id)
     except AssertionError:
-        if len(args.key_id):
+        if args.key_id:
             logger.error('AWS Access Key ID must contain 20 alphanumeric characters (%s).' % args.key_id)
         else:
             logger.error('AWS Access Key ID not specified.')
@@ -204,10 +206,10 @@ def parse_arguments():
 
     try:
         args.key = args.key or key
-        assert search(r'^[A-Z0-9/\+]{40}$', args.key, IGNORECASE)
+        assert args.key and search(r'^[A-Z0-9/\+]{40}$', args.key, IGNORECASE)
         logger.debug('AWS Account Secret Access Key argument validated.')
     except AssertionError:
-        if len(args.key):
+        if args.key:
             logger.error('AWS Account Secret Access Key must contain 40 alphanumeric characters and/or the following: /+ (%s).' \
                          % args.key)
         else:
