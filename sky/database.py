@@ -439,7 +439,7 @@ def create_database(subnets, name=None, engine='postgresql', storage=5, applicat
                                                     ENGINE_NAME[engine],                                      # engine
                                                     'username',                                               # master_username
                                                     'password',                                               # master_user_password
-                                                    db_name=None,
+                                                    db_name='app_db',
                                                     db_security_groups=None,                                  # Used in EC2-Classic.
                                                     vpc_security_group_ids=[sg.id for sg in security_groups],
                                                     availability_zone=None,                                   # Used in EC2-Classic.
