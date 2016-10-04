@@ -34,4 +34,8 @@ server {
 
 		proxy_redirect     http://app_server https://libretees.com;
 	}
+
+	location /static/ {
+		alias /srv/www/app/static/;
+	}
 }
